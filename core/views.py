@@ -14,6 +14,8 @@ from rest_framework import status
 from .models import Device, Sensor, SensorReading
 from .serializers import DeviceConfigSerializer, SensorReadingSerializer
 
+from .rule_engine import process_rules_for_reading
+
 class DeviceConfigView(APIView):
     """
     İstek yapan cihaza ait yapılandırma bilgilerini döndüren API endpoint'i.
@@ -36,14 +38,15 @@ class DeviceConfigView(APIView):
 
 class SubmitReadingView(APIView):
     """
-    İstemciden gelen sensör okumalarını kabul eden API endpoint'i.
-    İstek formatı: {"sensor": <sensor_id>, "value": {"key": "value"}}
+    İstemciden gelen sensör okumalarını kabul eden, kaydeden ve
+    kural motorunu tetikleyen API endpoint'i.
     """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         serializer = SensorReadingSerializer(data=request.data)
+        
         if serializer.is_valid():
             # Güvenlik Kontrolü: İstek yapan cihaz, bu sensörün sahibi mi?
             sensor_instance = serializer.validated_data['sensor']
@@ -56,15 +59,21 @@ class SubmitReadingView(APIView):
             # Veriyi veritabanına kaydet
             saved_reading = serializer.save()
 
-            # KURAL MOTORU BURADA ÇALIŞACAK (Şimdilik pas geçiyoruz)
-            # print(f"Kural motoru tetiklenecek: {saved_reading.id}")
+            # --- KURAL MOTORUNU TETİKLE ---
+            # Veri kaydedildikten hemen sonra, bu yeni okuma için kuralları işle.
+            try:
+                process_rules_for_reading(saved_reading)
+            except Exception as e:
+                # Kural motorunda bir hata olursa, API'nin çökmesini engelle.
+                # Hatayı sunucu konsoluna yazdır.
+                print(f"❌ KURAL MOTORU HATASI: {e}")
             
             # Başarılı yanıtı, kaydedilen veriyle birlikte geri döndür
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             # Gelen veri geçerli değilse hataları döndür
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
 class DashboardView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
 

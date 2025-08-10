@@ -66,3 +66,97 @@ class SensorReading(models.Model):
         verbose_name = "Sensör Okuması"
         verbose_name_plural = "Sensör Okumaları"
         ordering = ['-timestamp'] # Okumaları en yeniden en eskiye sırala
+
+class Rule(models.Model):
+    """
+    Bir veya daha fazla koşul ve eylemden oluşan bir kural setini tanımlar.
+    Örn: "Aşırı Sıcaklık Uyarısı"
+    """
+    name = models.CharField(max_length=200, unique=True, verbose_name="Kural Adı")
+    description = models.TextField(blank=True, verbose_name="Açıklama")
+    # Bu kural, hangi sensörden veri geldiğinde kontrol edilmeli?
+    trigger_sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE, verbose_name="Tetikleyici Sensör")
+    is_active = models.BooleanField(default=True, verbose_name="Aktif mi?")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Kural"
+        verbose_name_plural = "Kurallar"
+
+class Condition(models.Model):
+    """
+    Bir kuralın içindeki tek bir 'EĞER' koşulunu tanımlar.
+    Örn: "EĞER sıcaklık > 20"
+    """
+    OPERATOR_CHOICES = [
+        ('>', 'Büyüktür'),
+        ('>=', 'Büyük veya Eşittir'),
+        ('<', 'Küçüktür'),
+        ('<=', 'Küçük veya Eşittir'),
+        ('==', 'Eşittir'),
+        ('!=', 'Eşit Değildir'),
+    ]
+    rule = models.ForeignKey(Rule, on_delete=models.CASCADE, related_name='conditions', verbose_name="Ait Olduğu Kural")
+    # Gelen JSON veri içindeki hangi anahtarı kontrol edeceğiz? Örn: "temperature"
+    variable_key = models.CharField(max_length=100, verbose_name="Değişken Anahtarı (JSON Key)")
+    operator = models.CharField(max_length=4, choices=OPERATOR_CHOICES, verbose_name="Operatör")
+    # Ne ile karşılaştıracağız? Örn: 20
+    comparison_value = models.CharField(max_length=100, verbose_name="Karşılaştırma Değeri")
+
+    def __str__(self):
+        return f"EĞER {self.variable_key} {self.get_operator_display()} {self.comparison_value}"
+
+    class Meta:
+        verbose_name = "Koşul"
+        verbose_name_plural = "Koşullar"
+
+class NotificationRecipient(models.Model):
+    """Bildirimlerin gönderileceği kişileri veya hedefleri tanımlar."""
+    RECIPIENT_TYPE_CHOICES = [
+        ('email', 'E-posta'),
+        # ('sms', 'SMS'), -- Gelecek için
+    ]
+    name = models.CharField(max_length=100, verbose_name="Alıcı Adı (örn: Proje Sorumlusu)")
+    recipient_type = models.CharField(max_length=10, choices=RECIPIENT_TYPE_CHOICES, verbose_name="Alıcı Tipi")
+    address = models.CharField(max_length=255, verbose_name="Adres (e-posta, telefon no, vb.)")
+    is_active = models.BooleanField(default=True, verbose_name="Aktif mi?")
+
+    def __str__(self):
+        return f"{self.name} ({self.address})"
+
+    class Meta:
+        verbose_name = "Bildirim Alıcısı"
+        verbose_name_plural = "Bildirim Alıcıları"
+
+class Action(models.Model):
+    """
+    Bir kuralın koşulları sağlandığında çalıştırılacak eylemi tanımlar.
+    """
+    ACTION_TYPE_CHOICES = [
+        ('log_to_console', 'Sunucu Konsoluna Yaz'),
+        ('send_email', 'E-posta Gönder'), # YENİ EYLEM TİPİ
+    ]
+    rule = models.ForeignKey(Rule, on_delete=models.CASCADE, related_name='actions', verbose_name="Ait Olduğu Kural")
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES, verbose_name="Eylem Tipi")
+    
+    # YENİ: E-posta gönderilecek alıcıları seçmek için.
+    # ManyToManyField, bir eylemin birden çok alıcısı olabileceğini belirtir.
+    recipients = models.ManyToManyField(
+        NotificationRecipient, 
+        blank=True, # Bir eylemin alıcısı olmak zorunda değil (örn: log_to_console)
+        verbose_name="Bildirim Alıcıları"
+    )
+
+    # config alanı, mesaj şablonu gibi ek bilgileri tutmaya devam edecek.
+    config = models.JSONField(default=dict, blank=True, verbose_name="Eylem Yapılandırması (JSON)")
+
+    def __str__(self):
+        return f"EYLEM: {self.get_action_type_display()}"
+
+    class Meta:
+        verbose_name = "Eylem"
+        verbose_name_plural = "Eylemler"
