@@ -1,7 +1,11 @@
 from django.urls import path
-from .views import DeviceConfigView, SubmitReadingView # SubmitReadingView'i import et
+from .views import DeviceConfigView, SubmitReadingView, DashboardView # DashboardView'i import et
 
 urlpatterns = [
-    path('device/config/', DeviceConfigView.as_view(), name='device-config'),
-    path('readings/submit/', SubmitReadingView.as_view(), name='submit-reading'),
+    # API URLs
+    path('device/config/', DeviceConfigView.as_view(), name='api-device-config'),
+    path('readings/submit/', SubmitReadingView.as_view(), name='api-submit-reading'),
+
+    # Frontend (Dashboard) URL
+    path('dashboard/', DashboardView.as_view(), name='dashboard'),
 ]

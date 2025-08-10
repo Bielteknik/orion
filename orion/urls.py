@@ -1,8 +1,14 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Gelen isteklerde /api/v3/ ile başlayanları core/urls.py'ye yönlendir.
     path('api/v3/', include('core.urls')),
+    
+    # Ana sayfa (kök URL) istendiğinde, /dashboard/ adresine yönlendir.
+    path('', RedirectView.as_view(url='/dashboard/')),
+    
+    # Dashboard URL'sini de core.urls'den alıyoruz.
+    path('', include('core.urls')),
 ]

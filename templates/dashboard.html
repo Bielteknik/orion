@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div id="dashboard" class="page-content active">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </h2>
+        <div style="color: var(--text-light); font-weight: 500;">
+            <i class="fas fa-clock me-2"></i>
+            <span id="currentTime"></span>
+        </div>
+    </div>
+
+    <!-- Hata durumu veya Cihaz yoksa -->
+    {% if error %}
+        <div class="alert alert-warning">{{ error }} Lütfen admin panelinden bir cihaz atayın.</div>
+    {% elif device %}
+        <!-- İstasyon Kartı (Dinamik) -->
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div class="station-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5><i class="fas fa-map-marker-alt me-2"></i>{{ device.name }}</h5>
+                            <p class="mb-1">Konum: {{ device.location|default:"Belirtilmemiş" }}</p>
+                            <p class="mb-0">Durum: 
+                                {% if device.is_active %}
+                                    <span class="badge bg-success">Aktif</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Pasif</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="text-center">
+                            <i class="fas fa-snowflake weather-icon"></i>
+                            <!-- Son okumadaki sıcaklığı göster -->
+                            <h3>{{ last_reading.value.temperature|floatformat:1 }}°C</h3>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+        <!-- Sensör Kartı (Dinamik - Son Okumaya Göre) -->
+        {% if last_reading %}
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="sensor-card temperature">
+                    <div class="text-center">
+                        <i class="fas fa-thermometer-half fa-2x mb-2"></i>
+                        <h4>Sıcaklık</h4>
+                        <!-- 'floatformat:1' ondalık sayıyı 1 basamağa yuvarlar -->
+                        <h2>{{ last_reading.value.temperature|floatformat:1 }}°C</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="sensor-card humidity">
+                    <div class="text-center">
+                        <i class="fas fa-tint fa-2x mb-2"></i>
+                        <h4>Nem</h4>
+                        <h2>{{ last_reading.value.humidity|floatformat:0 }}%</h2>
+                    </div>
+                </div>
+            </div>
+            <!-- Diğer sensör kartları eklenebilir -->
+        </div>
+        {% endif %}
+
+        <!-- Grafik ve Liste -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="chart-container">
+                    <h5 class="mb-3">24 Saatlik Trend</h5>
+                    <canvas id="trendChart" height="100"></canvas>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card">
+                    <h5 style="color: var(--dark-color); font-weight: 600;" class="mb-3">Son Ölçümler</h5>
+                    <div class="list-group list-group-flush">
+                        {% for reading in recent_readings %}
+                            <div class="list-group-item bg-transparent border-secondary" style="color: var(--dark-color);">
+                                <div class="d-flex justify-content-between">
+                                    <span>
+                                        <!-- Her okumanın hangi sensörden geldiğini göster -->
+                                        <i class="fas fa-broadcast-tower me-2"></i>{{ reading.sensor.name }}
+                                    </span>
+                                    <span>
+                                        {{ reading.value.temperature|floatformat:1 }}°C / {{ reading.value.humidity|floatformat:0 }}%
+                                    </span>
+                                </div>
+                                <!-- 'timesince' filtresi "2 dakika önce" gibi bir çıktı verir -->
+                                <small style="color: var(--text-light);">{{ reading.timestamp|timesince }} önce</small>
+                            </div>
+                        {% empty %}
+                            <p class="text-muted">Henüz ölçüm verisi yok.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Zaman güncelleme
+    function updateTime() {
+        const now = new Date();
+        document.getElementById('currentTime').textContent = now.toLocaleString('tr-TR');
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // Grafik oluşturma (Dinamik veri ile)
+    document.addEventListener('DOMContentLoaded', function() {
+        // Django context'inden gelen JSON verilerini JavaScript değişkenlerine ata
+        // 'safe' filtresi, JSON string'inin HTML içinde güvenli bir şekilde render edilmesini sağlar.
+        const chartLabels = JSON.parse('{{ chart_labels|safe }}');
+        const tempData = JSON.parse('{{ chart_temp_data|safe }}');
+        const humData = JSON.parse('{{ chart_hum_data|safe }}');
+
+        const ctx = document.getElementById('trendChart');
+        if (ctx) {
+            new Chart(ctx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Sıcaklık (°C)',
+                        data: tempData,
+                        borderColor: 'rgb(231, 76, 60)',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        yAxisID: 'y',
+                        tension: 0.4,
+                        fill: true,
+                    }, {
+                        label: 'Nem (%)',
+                        data: humData,
+                        borderColor: 'rgb(52, 152, 219)',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        yAxisID: 'y1',
+                        tension: 0.4,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Sıcaklık (°C)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Nem (%)' },
+                            grid: { drawOnChartArea: false } 
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock extra_js %}
