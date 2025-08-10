@@ -44,3 +44,25 @@ class Sensor(models.Model):
         verbose_name = "Sensör"
         verbose_name_plural = "Sensörler"
         unique_together = ('device', 'name')
+
+class SensorReading(models.Model):
+    """
+    Bir sensörden gelen her bir ölçümü saklar.
+    """
+    # on_delete=models.CASCADE: Sensör silinirse, ona ait okumalar da silinir.
+    sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE, related_name='readings', verbose_name="Sensör")
+    
+    # Okunan veriyi esnek bir şekilde saklamak için JSONField kullanıyoruz.
+    # Örn: {"temperature": 25.4, "humidity": 60.1}
+    value = models.JSONField(verbose_name="Ölçüm Değeri")
+
+    # Okumanın ne zaman yapıldığını gösteren zaman damgası.
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Zaman Damgası")
+
+    def __str__(self):
+        return f"{self.sensor.name} @ {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+    class Meta:
+        verbose_name = "Sensör Okuması"
+        verbose_name_plural = "Sensör Okumaları"
+        ordering = ['-timestamp'] # Okumaları en yeniden en eskiye sırala
