@@ -112,3 +112,59 @@ class DashboardView(LoginRequiredMixin, View):
         }
         
         return render(request, 'dashboard.html', context)
+    
+class StationsView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
+
+    def get(self, request):
+        # Tüm aktif cihazları veritabanından çekelim.
+        all_devices = Device.objects.filter(is_active=True)
+        
+        devices_with_readings = []
+        for device in all_devices:
+            # Her cihazın son sensör okumasını bulalım.
+            last_reading = SensorReading.objects.filter(sensor__device=device).order_by('-timestamp').first()
+            devices_with_readings.append({
+                'device': device,
+                'last_reading': last_reading
+            })
+
+        context = {
+            'devices_with_readings': devices_with_readings
+        }
+        return render(request, 'stations.html', context)
+
+class SensorsView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
+
+    def get(self, request):
+        # Filtreleme için tüm cihazları alıp dropdown'a gönderelim
+        all_devices = Device.objects.all()
+        
+        # URL'den gelen 'device' parametresini al (örn: ?device=xxxx-xxxx)
+        selected_device_id = request.GET.get('device', None)
+        
+        # Başlangıçta tüm sensörleri hedef al
+        sensors_query = Sensor.objects.select_related('device').filter(is_active=True)
+        
+        # Eğer bir cihaz filtresi varsa, sorguyu güncelle
+        if selected_device_id:
+            sensors_query = sensors_query.filter(device_id=selected_device_id)
+        
+        sensors_with_readings = []
+        for sensor in sensors_query:
+            # Her sensörün en son okumasını bul
+            last_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
+            sensors_with_readings.append({
+                'sensor': sensor,
+                'last_reading': last_reading
+            })
+
+        context = {
+            'all_devices': all_devices,
+            'sensors_with_readings': sensors_with_readings,
+            'selected_device_id': selected_device_id
+        }
+        return render(request, 'sensors.html', context)  
+
+

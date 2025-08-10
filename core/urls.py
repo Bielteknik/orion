@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import DeviceConfigView, SubmitReadingView, DashboardView # DashboardView'i import et
+from .views import DeviceConfigView, SubmitReadingView, DashboardView, StationsView, SensorsView
 
 urlpatterns = [
     # API URLs
@@ -8,4 +8,6 @@ urlpatterns = [
 
     # Frontend (Dashboard) URL
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('stations/', StationsView.as_view(), name='stations'),
+    path('sensors/', SensorsView.as_view(), name='sensors'),    
 ]

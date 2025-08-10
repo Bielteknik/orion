@@ -10,10 +10,13 @@
                 <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                     <i class="fas fa-tachometer-alt me-2"></i>Dashboard
                 </a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'stations' %}active{% endif %}" href="{% url 'stations' %}">
+                    <i class="fas fa-building me-2"></i>İstasyonlar
+                </a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'sensors' %}active{% endif %}" href="{% url 'sensors' %}">
+                    <i class="fas fa-thermometer-half me-2"></i>Sensörler
+                </a>                                
             </li>
-            <!-- Diğer menü linkleri şimdilik devre dışı -->
-            <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-building me-2"></i>İstasyonlar</a></li>
-            <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-thermometer-half me-2"></i>Sensörler</a></li>
             <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-video me-2"></i>Kameralar</a></li>
             <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-chart-line me-2"></i>Veri Analizi</a></li>
             <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-map me-2"></i>İnteraktif Harita</a></li>

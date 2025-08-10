@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sensörler - {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div id="sensors" class="page-content active">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title">
+            <i class="fas fa-thermometer-half me-2"></i>Sensörler
+        </h2>
+        <div>
+            <!-- Filtreleme Formu -->
+            <form method="get" class="d-inline-block">
+                <select name="device" class="form-select d-inline-block me-2" style="width: auto;" onchange="this.form.submit()">
+                    <option value="">Tüm İstasyonlar</option>
+                    {% for device in all_devices %}
+                        <!-- Seçili olan istasyonu 'selected' yap -->
+                        <option value="{{ device.id }}" {% if device.id|stringformat:"s" == selected_device_id %}selected{% endif %}>
+                            {{ device.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+            <button class="btn btn-gradient" disabled>
+                <i class="fas fa-plus me-2"></i>Yeni Sensör (Yakında)
+            </button>
+        </div>
+    </div>
+
+    <!-- Sensör Kartları Görünümü -->
+    <div id="cardView" class="row">
+        {% for sensor_info in sensors_with_readings %}
+        <div class="col-md-4 mb-3">
+            {% with sensor=sensor_info.sensor reading=sensor_info.last_reading %}
+            <div class="sensor-card 
+                {% if 'sıcaklık' in sensor.name|lower %}temperature{% endif %}
+                {% if 'nem' in sensor.name|lower %}humidity{% endif %}">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6>{{ sensor.name }}</h6>
+                    {% if sensor.is_active %}
+                        <span class="badge bg-light text-dark">Aktif</span>
+                    {% else %}
+                         <span class="badge bg-secondary">Pasif</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        {% if reading %}
+                            <h3>
+                                <!-- Sensör verisine göre farklı gösterim -->
+                                {% if 'temperature' in reading.value %}
+                                    {{ reading.value.temperature|floatformat:1 }}°C
+                                {% elif 'humidity' in reading.value %}
+                                     {{ reading.value.humidity|floatformat:0 }}%
+                                {% else %}
+                                    <!-- Diğer veri türleri için genel gösterim -->
+                                    {{ reading.value|first }}
+                                {% endif %}
+                            </h3>
+                        {% else %}
+                            <h3>-</h3>
+                        {% endif %}
+                        <small>{{ sensor.device.name }}</small>
+                    </div>
+                    <div class="text-end">
+                        <i class="fas fa-thermometer-half fa-2x"></i>
+                        <br>
+                        <button class="btn btn-sm btn-outline-light mt-2" disabled>Detay</button>
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                {% if selected_device_id %}
+                    Bu istasyona ait görüntülenecek bir sensör bulunmuyor.
+                {% else %}
+                    Sistemde henüz görüntülenecek bir sensör bulunmuyor.
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock content %}
