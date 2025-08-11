@@ -178,29 +178,71 @@ class OrionAgent:
     def _parse_data(self, raw_data, sensor_config):
         parser_type = sensor_config.get('parser_type')
         parser_config = sensor_config.get('parser_config', {})
+
         if parser_type == 'regex':
             rule = parser_config.get('rule')
             if not rule: return None
             text_data = raw_data.decode('utf-8', errors='ignore')
             match = re.search(rule, text_data)
             if match:
-                return {'value': float(match.group(1))}
+                # İsimlendirilmiş grup varsa onu, yoksa ilk grubu kullan
+                if match.groupdict():
+                    # Değerleri float'a çevirmeyi dene, olmazsa string bırak
+                    parsed = {}
+                    for k, v in match.groupdict().items():
+                        try:
+                            parsed[k] = float(v)
+                        except (ValueError, TypeError):
+                            parsed[k] = v
+                    return parsed
+                else:
+                    return {'value': float(match.group(1))}
             return None
-        elif parser_type == 'binary_dfrobot_lidar':
-            if not isinstance(raw_data, bytes) or len(raw_data) < 4: return None
-            start_index = raw_data.find(b'\xFF')
-            if start_index == -1 or start_index + 4 > len(raw_data): return None
-            packet = raw_data[start_index : start_index + 4]
-            checksum = (packet[0] + packet[1] + packet[2]) & 0xFF
-            if checksum != packet[3]:
-                print("     -> Checksum hatası!")
+
+        # --- YENİ ve GÜNCELLENMİŞ BINARY BLOK ---
+        elif parser_type == 'binary':
+            binary_format = parser_config.get('format')
+            if not binary_format:
+                print("     -> HATA: Binary parser için 'format' belirtilmemiş.")
                 return None
-            distance_mm = (packet[1] << 8) + packet[2]
-            return {'distance_cm': round(distance_mm / 10.0, 1)}
+
+            # Belirtilen formata göre ilgili işleyiciyi çağır
+            if binary_format == 'dfrobot_lidar':
+                return self._parse_binary_dfrobot_lidar(raw_data)
+            
+            # Gelecekte başka binary formatları buraya eklenebilir
+            # elif binary_format == 'another_sensor':
+            #     return self._parse_another_sensor(raw_data)
+
+            else:
+                print(f"     -> UYARI: Bilinmeyen binary formatı: {binary_format}")
+                return None
+        # --- BLOK BİTTİ ---
+
         elif parser_type == 'simple':
             return raw_data
+        
         print(f"     -> UYARI: Bilinmeyen ayrıştırıcı tipi: {parser_type}")
         return None
+
+    def _parse_binary_dfrobot_lidar(self, raw_data):
+        """DFRobot Lidar'ın 4-byte'lık binary protokolünü işler."""
+        if not isinstance(raw_data, bytes) or len(raw_data) < 4:
+            return None
+        
+        start_index = raw_data.find(b'\xFF')
+        if start_index == -1 or start_index + 4 > len(raw_data):
+            return None
+        
+        packet = raw_data[start_index : start_index + 4]
+
+        checksum = (packet[0] + packet[1] + packet[2]) & 0xFF
+        if checksum != packet[3]:
+            print("     -> Checksum hatası!")
+            return None
+
+        distance_mm = (packet[1] << 8) + packet[2]
+        return {'distance_cm': round(distance_mm / 10.0, 1)}
 
     def _send_data_to_server(self, payload):
         try:

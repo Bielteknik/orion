@@ -28,7 +28,7 @@ class Device(models.Model):
 
 class Sensor(models.Model):
     INTERFACE_CHOICES = [('serial', 'Seri Port'), ('i2c', 'I2C'), ('virtual', 'Sanal')]
-    PARSER_TYPE_CHOICES = [('regex', 'Regex'), ('binary', 'Binary'), ('simple', 'Basit')]
+    PARSER_TYPE_CHOICES = [('regex', 'Regex'), ('binary', 'Binary Format'), ('simple', 'Basit (Değerin kendisi)')]
 
     device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='sensors', verbose_name="Bağlı Olduğu Cihaz")
     name = models.CharField(max_length=100, verbose_name="Sensör Adı")
