@@ -71,18 +71,24 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+// interactive_map.html içindeki createPopupContent fonksiyonunu bununla değiştirin
+
     function createPopupContent(device) {
         let statusBadge = device.is_active 
             ? '<span class="badge bg-success">Aktif</span>' 
             : '<span class="badge bg-danger">Pasif</span>';
 
         let dataHtml = '<p class="text-muted mt-2">Henüz veri yok.</p>';
+
         if (device.last_reading && device.last_reading.value) {
-            const reading = device.last_reading.value;
-            const temp = reading.temperature !== undefined ? `${reading.temperature.toFixed(1)}°C` : '-';
-            const hum = reading.humidity !== undefined ? `${Math.round(reading.humidity)}%` : '-';
-            const dist = reading.distance_cm !== undefined ? `${reading.distance_cm.toFixed(1)} cm` : '-';
-            const weight = reading.value !== undefined && reading.value.value !== undefined ? `${reading.value.value.toFixed(2)} kg` : '-';
+            const readingValue = device.last_reading.value; // Ana veri sözlüğü
+            
+            // Tüm olası anahtarları bu sözlükten arayalım
+            const temp = readingValue.temperature !== undefined ? `${readingValue.temperature.toFixed(1)}°C` : '-';
+            const hum = readingValue.humidity !== undefined ? `${Math.round(readingValue.humidity)}%` : '-';
+            const dist = readingValue.distance_cm !== undefined ? `${readingValue.distance_cm.toFixed(1)} cm` : '-';
+            // DÜZELTME: Ağırlık için doğru anahtarı ('value') arıyoruz
+            const weight = readingValue.value !== undefined ? `${readingValue.value.toFixed(2)} kg` : '-';
             
             dataHtml = `
                 <div style="font-size: 0.9em;">
