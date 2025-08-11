@@ -2,7 +2,7 @@ import serial
 import time
 
 # Seri port ayarları
-SERIAL_PORT = '/dev/ttyUSB0'  # veya '/dev/ttyS0', '/dev/ttyAMA0'
+SERIAL_PORT = '/dev/ttyAGIRLIK'
 BAUD_RATE = 9600
 
 # Seri portu aç

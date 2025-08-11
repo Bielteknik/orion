@@ -34,10 +34,20 @@ class Sensor(models.Model):
     name = models.CharField(max_length=100, verbose_name="Sensör Adı")
     is_active = models.BooleanField(default=True, verbose_name="Aktif mi?")
     
-    interface = models.CharField(max_length=20, choices=INTERFACE_CHOICES, verbose_name="Arayüz Tipi")
+    interface = models.CharField(
+        max_length=20, 
+        choices=INTERFACE_CHOICES, 
+        verbose_name="Arayüz Tipi",
+        blank=True # Artık bu alan boş olabilir
+    )
     config = models.JSONField(default=dict, blank=True, verbose_name="Arayüz Yapılandırması (JSON)")
     
-    parser_type = models.CharField(max_length=20, choices=PARSER_TYPE_CHOICES, verbose_name="Veri Ayrıştırıcı Tipi")
+    parser_type = models.CharField(
+        max_length=20, 
+        choices=PARSER_TYPE_CHOICES, 
+        verbose_name="Veri Ayrıştırıcı Tipi",
+        blank=True # Artık bu alan boş olabilir
+    )
     parser_config = models.JSONField(default=dict, blank=True, verbose_name="Ayrıştırıcı Yapılandırması (JSON)")
 
     read_interval = models.PositiveIntegerField(default=60, verbose_name="Okuma Sıklığı (Saniye)")

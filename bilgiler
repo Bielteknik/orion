@@ -48,3 +48,15 @@ crw-rw---- 1 root       dialout   4, 64 Aug 11 11:01 /dev/ttyS0
 crw-rw---- 1 root       dialout 188,  0 Aug 11 11:01 /dev/ttyUSB0
 crw-rw---- 1 root       dialout 188,  1 Aug 11 11:01 /dev/ttyUSB1
 bielteknik@MeteorologyPi4B:~/orion $ 
+---------------------
+Ağırlık Sensörü:
+Arayüz Tipi: Seri Port
+Arayüz Yapılandırması: {"port": "/dev/ttyAGIRLIK", "baudrate": 9600}
+Veri Ayrıştırıcı Tipi: Simple (Çünkü artık tüm işi sürücü yapıyor)
+Ayrıştırıcı Yapılandırması: {"driver": "hx711_load_cell"}
+
+Mesafe Sensörü:
+Arayüz Tipi: Seri Port
+Arayüz Yapılandırması: {"port": "/dev/ttyMESAFE", "baudrate": 9600}
+Veri Ayrıştırıcı Tipi: Simple
+Ayrıştırıcı Yapılandırması: {"driver": "dfrobot_lidar"}
