@@ -147,7 +147,7 @@ class AnalyticsView(LoginRequiredMixin, View):
 class MapView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
     def get(self, request):
-        return render(request, 'map.html', {})
+        return render(request, 'interactive_map.html', {})
 
 class AlertsView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
