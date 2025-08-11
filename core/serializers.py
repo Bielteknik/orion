@@ -65,3 +65,9 @@ class SensorSerializer(serializers.ModelSerializer):
             'config', 'parser_type', 'parser_config', 'read_interval'
         ]
         read_only_fields = ['id', 'device_name']
+
+class AnalyticsDataSerializer(serializers.ModelSerializer):
+    """ Veri analizi grafiği için SensorReading verisini serileştirir. """
+    class Meta:
+        model = SensorReading
+        fields = ['timestamp', 'value']

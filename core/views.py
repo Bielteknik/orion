@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.shortcuts import render
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -7,11 +8,12 @@ from django.contrib.auth.models import User
 from django.utils.crypto import get_random_string
 import json
 
+
 from rest_framework import status, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 # Modelleri import ediyoruz
 from .models import Alert, Device, Sensor, SensorReading
@@ -21,12 +23,11 @@ from .serializers import (
     DeviceConfigSerializer, 
     SensorReadingSerializer,
     DeviceSerializer,
-    SensorSerializer
+    SensorSerializer,
 )
 
 # Kural motorunu import ediyoruz
 from .rule_engine import process_rules_for_reading
-
 
 # --- API Endpoints ---
 
@@ -167,3 +168,68 @@ class SettingsView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
     def get(self, request):
         return render(request, 'settings.html', {})
+
+class AnalyticsDataView(APIView):
+    """
+    Veri analizi sayfası için dinamik olarak filtrelenmiş
+    sensör okuma verilerini döndüren API endpoint'i.
+    """
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # --- 1. Filtre Parametrelerini Al ---
+        # Sensör ID'lerini al (örn: ?sensors=1,2,5)
+        sensor_ids_str = request.query_params.get('sensors', '')
+        if not sensor_ids_str:
+            return Response({"error": "Lütfen en az bir sensör seçin."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Gelen string'i integer listesine çevir
+            sensor_ids = [int(sid) for sid in sensor_ids_str.split(',')]
+        except (ValueError, TypeError):
+            return Response({"error": "Geçersiz sensör ID formatı."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Zaman aralığını al (örn: ?period=24h)
+        period = request.query_params.get('period', '24h') # Varsayılan: son 24 saat
+
+        # --- 2. Zaman Aralığına Göre Filtre Oluştur ---
+        now = timezone.now()
+        if period == '7d':
+            start_time = now - timedelta(days=7)
+        elif period == '30d':
+            start_time = now - timedelta(days=30)
+        else: # Varsayılan '24h'
+            start_time = now - timedelta(hours=24)
+        
+        # --- 3. Veritabanı Sorgusunu Oluştur ---
+        # Veritabanına daha az yük bindirmek için .values() kullanarak sadece
+        # ihtiyacımız olan alanları çekiyoruz.
+        queryset = SensorReading.objects.filter(
+            sensor_id__in=sensor_ids,
+            timestamp__gte=start_time
+        ).select_related('sensor', 'sensor__device').order_by('sensor_id', 'timestamp')
+
+        # --- 4. Veriyi Sensörlere Göre Grupla ---
+        # Sonuç formatı: {'sensor_1_id': {'name':..., 'readings': [reading1, ...]}, ...}
+        data_by_sensor = {}
+
+        for reading in queryset:
+            sensor_id = reading.sensor_id
+            if sensor_id not in data_by_sensor:
+                # Sensör bilgilerini daha önce sorgudan aldığımız için veritabanına tekrar gitmiyoruz.
+                data_by_sensor[sensor_id] = {
+                    'name': reading.sensor.name,
+                    'device': reading.sensor.device.name,
+                    'readings': []
+                }
+            
+            # Her okuma için sadece timestamp ve value'yu ekliyoruz.
+            data_by_sensor[sensor_id]['readings'].append({
+                'timestamp': reading.timestamp,
+                'value': reading.value
+            })
+
+        return Response(data_by_sensor)
+
+

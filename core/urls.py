@@ -12,7 +12,8 @@ from .views import (
     AnalyticsView,
     MapView,
     AlertsView,
-    SettingsView
+    SettingsView,
+    AnalyticsDataView
 )
 
 # Router'ı burada tanımlıyoruz, tıpkı daha önce olduğu gibi.
@@ -31,6 +32,7 @@ urlpatterns = [
     path('map/', MapView.as_view(), name='map'),
     path('alerts/', AlertsView.as_view(), name='alerts'),
     path('settings/', SettingsView.as_view(), name='settings'),
+    path('analytics/data/', AnalyticsDataView.as_view(), name='analytics-data'),
 
     # Özel API URL'leri (router'a uymayanlar)
     path('api/v3/device/config/', DeviceConfigView.as_view(), name='api-device-config'),
