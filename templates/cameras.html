@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Kameralar - {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div id="cameras" class="page-content active">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title">
+            <i class="fas fa-video me-2"></i>Kameralar
+        </h2>
+        <div>
+            <button class="btn btn-gradient" disabled>
+                <i class="fas fa-plus me-2"></i>Yeni Kamera (Yakında)
+            </button>
+        </div>
+    </div>
+
+    <!-- Kamera Kontrol Paneli (Statik) -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-video fa-2x text-success mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">1</h4>
+                <p style="color: var(--text-light);" class="mb-0">Aktif Kamera</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-record-vinyl fa-2x text-danger mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">0</h4>
+                <p style="color: var(--text-light);" class="mb-0">Kayıt Yapıyor</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-hdd fa-2x text-warning mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">0 GB</h4>
+                <p style="color: var(--text-light);" class="mb-0">Kullanılan Alan</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-exclamation-triangle fa-2x text-secondary mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">0</h4>
+                <p style="color: var(--text-light);" class="mb-0">Offline Kamera</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Örnek Kamera Kartı (Statik) -->
+        <div class="col-md-6 mb-4">
+            <div class="glass-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 style="color: var(--dark-color); font-weight: 600;">
+                        <i class="fas fa-map-marker-alt me-2"></i>Merkez İstasyon - Kamera 1
+                    </h5>
+                    <div>
+                        <span class="badge bg-success me-2">Canlı</span>
+                    </div>
+                </div>
+                <div class="bg-dark rounded mb-3 position-relative" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                    <div class="text-center text-white">
+                        <i class="fas fa-video-slash fa-3x mb-2"></i>
+                        <p>Canlı Yayın Görüntülenemiyor</p>
+                        <small>(Bu özellik henüz aktif değil)</small>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <button class="btn btn-sm btn-outline-light" disabled>
+                        <i class="fas fa-expand me-1"></i>Tam Ekran
+                    </button>
+                    <button class="btn btn-sm btn-outline-light" disabled>
+                        <i class="fas fa-camera me-1"></i>Fotoğraf Çek
+                    </button>
+                    <button class="btn btn-sm btn-outline-light" disabled>
+                        <i class="fas fa-cog me-1"></i>Ayarlar
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Diğer Kameralar Eklendiğinde Buraya Gelecek -->
+        <div class="col-md-6 mb-4">
+             <div class="alert alert-info h-100 d-flex align-items-center justify-content-center">
+                <p class="mb-0 text-center">
+                    <i class="fas fa-plus-circle fa-2x mb-2"></i><br>
+                    Yakında daha fazla kamera eklenecek.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

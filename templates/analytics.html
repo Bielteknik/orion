@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Veri Analizi - {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div id="analytics" class="page-content active">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title">
+            <i class="fas fa-chart-line me-2"></i>Veri Analizi
+        </h2>
+        <div>
+            <select class="form-select d-inline-block" style="width: auto;">
+                <option>Son 24 Saat</option>
+                <option>Son 7 Gün</option>
+                <option>Son 30 Gün</option>
+            </select>
+            <button class="btn btn-gradient ms-2" disabled>
+                <i class="fas fa-download me-2"></i>Veri İndir (Yakında)
+            </button>
+        </div>
+    </div>
+
+    <!-- Analitik Sekmeler (Tabs) -->
+    <div class="glass-card mb-4">
+        <ul class="nav nav-pills mb-3" id="analyticsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="realtime-tab" data-bs-toggle="pill" data-bs-target="#realtime" type="button" role="tab">
+                    <i class="fas fa-chart-line me-2"></i>Gerçek Zamanlı
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link disabled" type="button">
+                    <i class="fas fa-brain me-2"></i>AI Tahminler (Yakında)
+                </button>
+            </li>
+             <li class="nav-item" role="presentation">
+                <button class="nav-link disabled" type="button">
+                    <i class="fas fa-balance-scale me-2"></i>Karşılaştırma (Yakında)
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="analyticsTabContent">
+            <!-- Gerçek Zamanlı Analiz Sekmesi -->
+            <div class="tab-pane fade show active" id="realtime" role="tabpanel">
+                <!-- İstatistik Kartları (Statik) -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="glass-card text-center">
+                            <i class="fas fa-thermometer-half fa-2x text-danger mb-2"></i>
+                            <h4 style="color: var(--dark-color); font-weight: 600;">-15.2°C</h4>
+                            <p style="color: var(--text-light);" class="mb-0">Ortalama Sıcaklık</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="glass-card text-center">
+                            <i class="fas fa-wind fa-2x text-info mb-2"></i>
+                            <h4 style="color: var(--dark-color); font-weight: 600;">52 km/h</h4>
+                            <p style="color: var(--text-light);" class="mb-0">Maksimum Rüzgar</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="glass-card text-center">
+                            <i class="fas fa-weight fa-2x text-secondary mb-2"></i>
+                            <h4 style="color: var(--dark-color); font-weight: 600;">145 kg/m²</h4>
+                            <p style="color: var(--text-light);" class="mb-0">Maksimum Kar Ağırlığı</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="glass-card text-center">
+                            <i class="fas fa-tint fa-2x text-primary mb-2"></i>
+                            <h4 style="color: var(--dark-color); font-weight: 600;">76%</h4>
+                            <p style="color: var(--text-light);" class="mb-0">Ortalama Nem</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ana Grafik -->
+                <div class="chart-container mb-4">
+                    <h5 class="mb-3">Çoklu Sensör Grafiği</h5>
+                    <canvas id="analyticsChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Analitik sayfasındaki grafik (statik veri ile)
+    const ctx = document.getElementById('analyticsChart');
+    if (ctx) {
+        new Chart(ctx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: ['-24h', '-20h', '-16h', '-12h', '-8h', '-4h', 'Şimdi'],
+                datasets: [{
+                    label: 'Sıcaklık (°C)',
+                    data: [-15, -18, -16, -12, -10, -14, -12],
+                    borderColor: 'rgb(231, 76, 60)',
+                    yAxisID: 'y',
+                    tension: 0.4
+                }, {
+                    label: 'Nem (%)',
+                    data: [75, 80, 78, 72, 68, 76, 78],
+                    borderColor: 'rgb(52, 152, 219)',
+                    yAxisID: 'y1',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Sıcaklık (°C)' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Nem (%)' },
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock extra_js %}

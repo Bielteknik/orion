@@ -7,7 +7,12 @@ from .views import (
     StationsView,
     SensorsView,
     DeviceViewSet,
-    SensorViewSet
+    SensorViewSet,
+    CamerasView,
+    AnalyticsView,
+    MapView,
+    AlertsView,
+    SettingsView
 )
 
 # Router'ı burada tanımlıyoruz, tıpkı daha önce olduğu gibi.
@@ -21,6 +26,11 @@ urlpatterns = [
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
     path('stations/', StationsView.as_view(), name='stations'),
     path('sensors/', SensorsView.as_view(), name='sensors'),
+    path('cameras/', CamerasView.as_view(), name='cameras'),
+    path('analytics/', AnalyticsView.as_view(), name='analytics'),
+    path('map/', MapView.as_view(), name='map'),
+    path('alerts/', AlertsView.as_view(), name='alerts'),
+    path('settings/', SettingsView.as_view(), name='settings'),
 
     # Özel API URL'leri (router'a uymayanlar)
     path('api/v3/device/config/', DeviceConfigView.as_view(), name='api-device-config'),

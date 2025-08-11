@@ -15,13 +15,29 @@
                 </a>
                 <a class="nav-link {% if request.resolver_match.url_name == 'sensors' %}active{% endif %}" href="{% url 'sensors' %}">
                     <i class="fas fa-thermometer-half me-2"></i>Sensörler
-                </a>                                
+                </a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'cameras' %}active{% endif %}" href="{% url 'cameras' %}">
+                    <i class="fas fa-video me-2"></i>Kameralar
+                </a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">
+                    <i class="fas fa-chart-line me-2"></i>Veri Analizi
+                </a>
             </li>
-            <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-video me-2"></i>Kameralar</a></li>
-            <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-chart-line me-2"></i>Veri Analizi</a></li>
-            <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-map me-2"></i>İnteraktif Harita</a></li>
-            <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-exclamation-triangle me-2"></i>Uyarılar</a></li>
-            <li class="nav-item"><a class="nav-link" href="#"><i class="fas fa-cog me-2"></i>Ayarlar</a></li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'map' %}active{% endif %}" href="{% url 'map' %}">
+                    <i class="fas fa-map me-2"></i>İnteraktif Harita
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'alerts' %}active{% endif %}" href="{% url 'alerts' %}">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Uyarılar
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}">
+                    <i class="fas fa-cog me-2"></i>Ayarlar
+                </a>
+            </li>
         </ul>
     </div>
 </nav>

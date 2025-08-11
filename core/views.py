@@ -205,4 +205,37 @@ class SensorViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Sensor.objects.select_related('device').all().order_by('name')
     
+class CamerasView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
 
+    def get(self, request):
+        # Gelecekte burada veritabanından kamera bilgilerini çekeceğiz.
+        # Şimdilik boş bir context gönderiyoruz.
+        context = {}
+        return render(request, 'cameras.html', context)
+
+class AnalyticsView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
+
+    def get(self, request):
+        # Gelecekte burada veritabanından analiz için veri çekeceğiz.
+        context = {}
+        return render(request, 'analytics.html', context)
+
+class MapView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
+    def get(self, request):
+        context = {}
+        return render(request, 'interactive_map.html', context)
+
+class AlertsView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
+    def get(self, request):
+        context = {}
+        return render(request, 'alerts.html', context)
+
+class SettingsView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
+    def get(self, request):
+        context = {}
+        return render(request, 'settings.html', context)
