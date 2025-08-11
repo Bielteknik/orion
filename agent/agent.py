@@ -5,7 +5,6 @@ import re
 import sqlite3
 import sys
 import time
-import subprocess
 import importlib
 from apscheduler.schedulers.blocking import BlockingScheduler
 import requests
@@ -230,33 +229,6 @@ class OrionAgent:
         except (KeyboardInterrupt, SystemExit):
             print("\n🛑 Agent durduruluyor..."); self.scheduler.shutdown()
 
-# --- Script Başlangıç Kısmı ---
-
-def check_and_install_dependencies():
-    """ Gerekli temel kütüphanelerin yüklü olup olmadığını kontrol eder, eksikse yükler. """
-    base_dependencies = ['requests', 'apscheduler']
-    if sys.platform.startswith('linux'):
-        base_dependencies.extend(['pyserial', 'smbus2'])
-    
-    missing_packages = []
-    for package_name in base_dependencies:
-        try:
-            __import__(package_name)
-        except ImportError:
-            missing_packages.append(package_name)
-
-    if missing_packages:
-        print(f"\nEksik kütüphaneler bulundu: {', '.join(missing_packages)}. Yükleniyor...")
-        try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', *missing_packages])
-            print("✅ Gerekli kütüphaneler başarıyla kuruldu.")
-            print("Lütfen script'i tekrar çalıştırın.")
-            sys.exit(0)
-        except subprocess.CalledProcessError as e:
-            print(f"❌ HATA: Kütüphaneler yüklenemedi. Lütfen manuel yükleyin: 'pip install {' '.join(missing_packages)}'. Hata: {e}")
-            sys.exit(1)
-
-if __name__ == "__main__":
-    check_and_install_dependencies()
+if __name__ == "__main__":    
     agent = OrionAgent()
     agent.run()
