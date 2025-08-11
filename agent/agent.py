@@ -5,7 +5,6 @@ import re
 import sqlite3
 import sys
 import time
-import subprocess
 from apscheduler.schedulers.blocking import BlockingScheduler
 import requests
 
@@ -240,38 +239,6 @@ class OrionAgent:
         except (KeyboardInterrupt, SystemExit):
             print("\n🛑 Agent durduruluyor..."); self.scheduler.shutdown()
 
-def check_and_install_dependencies():
-    """ Gerekli kütüphanelerin yüklü olup olmadığını kontrol eder, eksikse yükler. """
-    base_dependencies = ['requests', 'apscheduler']
-    # Donanım kütüphanelerini sadece Raspberry Pi gibi Linux sistemlerinde zorunlu kıl
-    if sys.platform.startswith('linux'):
-        base_dependencies.extend(['pyserial', 'smbus2'])
-    
-    missing_packages = []
-    for package_name in base_dependencies:
-        try:
-            __import__(package_name)
-        except ImportError:
-            missing_packages.append(package_name)
-
-    # Sadece eksik paket varsa yükleme işlemi yap
-    if missing_packages:
-        print(f"\nEksik kütüphaneler bulundu: {', '.join(missing_packages)}. Yükleniyor...")
-        try:
-            # Sadece eksik olanları yükle
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', *missing_packages])
-            print("✅ Gerekli kütüphaneler başarıyla kuruldu.")
-            # Kütüphaneler YENİ kurulduğu için, script'in yeniden başlatılması en sağlıklısı
-            print("Lütfen script'i tekrar çalıştırın.")
-            sys.exit(0) # Başarılı bir şekilde çıkış yap
-        except subprocess.CalledProcessError as e:
-            print(f"❌ HATA: Kütüphaneler yüklenemedi. Lütfen manuel yükleyin: 'pip install {' '.join(missing_packages)}'. Hata: {e}")
-            sys.exit(1) # Hata ile çıkış yap
-    
-    # Eğer bu noktaya geldiyse, tüm kütüphaneler zaten yüklü demektir.
-    # Hiçbir mesaj göstermeden devam et.
-
 if __name__ == "__main__":
-    check_and_install_dependencies()
     agent = OrionAgent()
     agent.run()
