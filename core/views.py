@@ -14,7 +14,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework import viewsets, status
 
 from .models import Device, Sensor, SensorReading
-from .serializers import DeviceConfigSerializer, SensorReadingSerializer, DeviceSerializer
+from .serializers import DeviceConfigSerializer, SensorReadingSerializer, DeviceSerializer, SensorSerializer
 
 from .rule_engine import process_rules_for_reading
 from core import serializers
@@ -148,36 +148,29 @@ class StationsView(LoginRequiredMixin, View):
 
 class SensorsView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
-
     def get(self, request):
-        # Filtreleme için tüm cihazları alıp dropdown'a gönderelim
         all_devices = Device.objects.all()
-        
-        # URL'den gelen 'device' parametresini al (örn: ?device=xxxx-xxxx)
         selected_device_id = request.GET.get('device', None)
-        
-        # Başlangıçta tüm sensörleri hedef al
         sensors_query = Sensor.objects.select_related('device').filter(is_active=True)
-        
-        # Eğer bir cihaz filtresi varsa, sorguyu güncelle
         if selected_device_id:
             sensors_query = sensors_query.filter(device_id=selected_device_id)
-        
+
         sensors_with_readings = []
         for sensor in sensors_query:
-            # Her sensörün en son okumasını bul
             last_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
             sensors_with_readings.append({
                 'sensor': sensor,
                 'last_reading': last_reading
             })
-
         context = {
             'all_devices': all_devices,
             'sensors_with_readings': sensors_with_readings,
-            'selected_device_id': selected_device_id
+            'selected_device_id': selected_device_id,
+            # YENİ: Modeldaki seçenekleri şablona gönder
+            'sensor_interface_choices': Sensor.INTERFACE_CHOICES,
+            'sensor_parser_choices': Sensor.PARSER_TYPE_CHOICES,
         }
-        return render(request, 'sensors.html', context)  
+        return render(request, 'sensors.html', context)
 
 class DeviceViewSet(viewsets.ModelViewSet):
     queryset = Device.objects.all()
@@ -206,3 +199,10 @@ class DeviceViewSet(viewsets.ModelViewSet):
 
         # 3. Cihazı bu yeni kullanıcıya atayarak kaydet
         serializer.save(user=user)
+
+class SensorViewSet(viewsets.ModelViewSet):
+    serializer_class = SensorSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Sensor.objects.select_related('device').all().order_by('name')
+    
+

@@ -2,12 +2,16 @@ from rest_framework import serializers
 from .models import Device, Sensor, SensorReading
 
 class SensorSerializer(serializers.ModelSerializer):
+    device_name = serializers.CharField(source='device.name', read_only=True)
+    device = serializers.PrimaryKeyRelatedField(queryset=Device.objects.all())
+
     class Meta:
         model = Sensor
         fields = [
-            'id', 'name', 'is_active', 'interface', 'config',
-            'parser_type', 'parser_config', 'read_interval'
+            'id', 'name', 'device', 'device_name', 'is_active', 'interface', 
+            'config', 'parser_type', 'parser_config', 'read_interval'
         ]
+        read_only_fields = ['id', 'device_name']
 
 class DeviceConfigSerializer(serializers.ModelSerializer):
     # Bu sensörler, Device modelindeki 'sensors' related_name'inden gelir.

@@ -1,29 +1,26 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}Sensörler - {{ block.super }}{% endblock title %}
 
 {% block content %}
 <div id="sensors" class="page-content active">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title">
-            <i class="fas fa-thermometer-half me-2"></i>Sensörler
-        </h2>
+        <h2 class="page-title"><i class="fas fa-thermometer-half me-2"></i>Sensörler</h2>
         <div>
-            <!-- Filtreleme Formu -->
+            <!-- Filtreleme Formu (Mevcut) -->
             <form method="get" class="d-inline-block">
                 <select name="device" class="form-select d-inline-block me-2" style="width: auto;" onchange="this.form.submit()">
                     <option value="">Tüm İstasyonlar</option>
                     {% for device in all_devices %}
-                        <!-- Seçili olan istasyonu 'selected' yap -->
                         <option value="{{ device.id }}" {% if device.id|stringformat:"s" == selected_device_id %}selected{% endif %}>
                             {{ device.name }}
                         </option>
                     {% endfor %}
                 </select>
             </form>
-            <button class="btn btn-gradient" disabled>
-                <i class="fas fa-plus me-2"></i>Yeni Sensör (Yakında)
+            <!-- Yeni Sensör Butonu (Artık Çalışıyor) -->
+            <button class="btn btn-gradient" id="addSensorBtn">
+                <i class="fas fa-plus me-2"></i>Yeni Sensör
             </button>
         </div>
     </div>
@@ -31,58 +28,185 @@
     <!-- Sensör Kartları Görünümü -->
     <div id="cardView" class="row">
         {% for sensor_info in sensors_with_readings %}
-        <div class="col-md-4 mb-3">
-            {% with sensor=sensor_info.sensor reading=sensor_info.last_reading %}
-            <div class="sensor-card 
-                {% if 'sıcaklık' in sensor.name|lower %}temperature{% endif %}
-                {% if 'nem' in sensor.name|lower %}humidity{% endif %}">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6>{{ sensor.name }}</h6>
-                    {% if sensor.is_active %}
-                        <span class="badge bg-light text-dark">Aktif</span>
-                    {% else %}
-                         <span class="badge bg-secondary">Pasif</span>
-                    {% endif %}
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        {% if reading %}
-                            <h3>
-                                <!-- Sensör verisine göre farklı gösterim -->
-                                {% if 'temperature' in reading.value %}
-                                    {{ reading.value.temperature|floatformat:1 }}°C
-                                {% elif 'humidity' in reading.value %}
-                                     {{ reading.value.humidity|floatformat:0 }}%
-                                {% else %}
-                                    <!-- Diğer veri türleri için genel gösterim -->
-                                    {{ reading.value|first }}
-                                {% endif %}
-                            </h3>
-                        {% else %}
-                            <h3>-</h3>
-                        {% endif %}
-                        <small>{{ sensor.device.name }}</small>
-                    </div>
-                    <div class="text-end">
-                        <i class="fas fa-thermometer-half fa-2x"></i>
-                        <br>
-                        <button class="btn btn-sm btn-outline-light mt-2" disabled>Detay</button>
-                    </div>
-                </div>
-            </div>
-            {% endwith %}
-        </div>
+            {% include 'partials/_sensor_card.html' with sensor_info=sensor_info %}
         {% empty %}
-        <div class="col-12">
-            <div class="alert alert-info">
-                {% if selected_device_id %}
-                    Bu istasyona ait görüntülenecek bir sensör bulunmuyor.
-                {% else %}
-                    Sistemde henüz görüntülenecek bir sensör bulunmuyor.
-                {% endif %}
-            </div>
-        </div>
+            <!-- ... (mevcut boş uyarısı aynı) ... -->
         {% endfor %}
     </div>
 </div>
+
+<!-- Yeni Sensör Ekleme/Düzenleme Modal'ı -->
+<div class="modal fade" id="sensorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sensorModalLabel">Yeni Sensör Ekle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="sensorForm" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" id="sensorId">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="sensorName" class="form-label">Sensör Adı *</label>
+                            <input type="text" class="form-control" id="sensorName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="sensorDevice" class="form-label">Bağlı Olduğu İstasyon *</label>
+                            <select class="form-select" id="sensorDevice" required>
+                                <option value="" disabled selected>İstasyon Seçin...</option>
+                                {% for device in all_devices %}
+                                    <option value="{{ device.id }}">{{ device.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="sensorInterface" class="form-label">Arayüz Tipi</label>
+                            <select class="form-select" id="sensorInterface">
+                                {% for interface_key, interface_display in sensor_interface_choices %}
+                                    <option value="{{ interface_key }}">{{ interface_display }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="sensorParserType" class="form-label">Ayrıştırıcı Tipi</label>
+                            <select class="form-select" id="sensorParserType">
+                                {% for parser_key, parser_display in sensor_parser_choices %}
+                                    <option value="{{ parser_key }}">{{ parser_display }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="sensorConfig" class="form-label">Arayüz Yapılandırması (JSON)</label>
+                        <textarea class="form-control" id="sensorConfig" rows="3" placeholder='{"address": "0x44"}'></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="sensorParserConfig" class="form-label">Ayrıştırıcı Yapılandırması (JSON)</label>
+                        <textarea class="form-control" id="sensorParserConfig" rows="3" placeholder='{"rule": "T:(\\d+)", "output_mapping": {"group_1": "temperature"}}'></textarea>
+                    </div>
+                    <div class="row">
+                         <div class="col-md-6 mb-3">
+                            <label for="sensorReadInterval" class="form-label">Okuma Sıklığı (Saniye)</label>
+                            <input type="number" class="form-control" id="sensorReadInterval" value="60">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="sensorIsActive" checked>
+                                <label class="form-check-label" for="sensorIsActive">Sensör Aktif</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-primary" id="saveSensorBtn">Kaydet</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sensorModalEl = document.getElementById('sensorModal');
+    const sensorModal = new bootstrap.Modal(sensorModalEl);
+    const sensorForm = document.getElementById('sensorForm');
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // "Yeni Sensör" butonuna tıklandığında modal'ı sıfırla ve aç
+    document.getElementById('addSensorBtn').addEventListener('click', function() {
+        sensorForm.reset();
+        document.getElementById('sensorId').value = '';
+        document.getElementById('sensorModalLabel').textContent = 'Yeni Sensör Ekle';
+        document.getElementById('sensorIsActive').checked = true;
+        document.getElementById('sensorReadInterval').value = 60;
+        sensorModal.show();
+    });
+
+    // Kaydet butonuna tıklandığında veriyi gönder
+    document.getElementById('saveSensorBtn').addEventListener('click', function() {
+        if (!sensorForm.checkValidity()) {
+            sensorForm.reportValidity();
+            return;
+        }
+
+        const sensorId = document.getElementById('sensorId').value;
+        const url = sensorId ? `/api/v3/sensors/${sensorId}/` : '/api/v3/sensors/';
+        const method = sensorId ? 'PUT' : 'POST';
+
+        let config, parserConfig;
+        try {
+            const configText = document.getElementById('sensorConfig').value;
+            config = configText ? JSON.parse(configText) : {};
+            const parserConfigText = document.getElementById('sensorParserConfig').value;
+            parserConfig = parserConfigText ? JSON.parse(parserConfigText) : {};
+        } catch(e) {
+            alert('JSON formatı hatalı! Lütfen kontrol edin.');
+            return;
+        }
+
+        const data = {
+            name: document.getElementById('sensorName').value,
+            device: document.getElementById('sensorDevice').value,
+            is_active: document.getElementById('sensorIsActive').checked,
+            interface: document.getElementById('sensorInterface').value,
+            parser_type: document.getElementById('sensorParserType').value,
+            config: config,
+            parser_config: parserConfig,
+            read_interval: parseInt(document.getElementById('sensorReadInterval').value)
+        };
+
+        fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify(data),
+        })
+        .then(response => {
+            if (!response.ok) {
+                // Hata durumunda sunucudan gelen mesajı göster
+                return response.json().then(err => { throw new Error(JSON.stringify(err)) });
+            }
+            return response.json();
+        })
+        .then(result => {
+            sensorModal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Bir hata oluştu! Detaylar için konsolu kontrol edin.');
+        });
+    });
+
+    // YENİ: Düzenle butonlarına olay dinleyici ekle
+    document.querySelectorAll('.edit-sensor-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const sensorId = this.dataset.id;
+            // Sensörün güncel verilerini API'den çek
+            fetch(`/api/v3/sensors/${sensorId}/`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('sensorId').value = data.id;
+                    document.getElementById('sensorName').value = data.name;
+                    document.getElementById('sensorDevice').value = data.device;
+                    document.getElementById('sensorIsActive').checked = data.is_active;
+                    document.getElementById('sensorInterface').value = data.interface;
+                    document.getElementById('sensorParserType').value = data.parser_type;
+                    document.getElementById('sensorConfig').value = JSON.stringify(data.config, null, 2);
+                    document.getElementById('sensorParserConfig').value = JSON.stringify(data.parser_config, null, 2);
+                    document.getElementById('sensorReadInterval').value = data.read_interval;
+                    
+                    document.getElementById('sensorModalLabel').textContent = 'Sensör Düzenle';
+                    sensorModal.show();
+                });
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

@@ -1,0 +1,40 @@
+{% with sensor=sensor_info.sensor reading=sensor_info.last_reading %}
+<div class="col-md-4 mb-3">
+    <div class="sensor-card 
+        {% if 'sıcaklık' in sensor.name|lower %}temperature{% endif %}
+        {% if 'nem' in sensor.name|lower %}humidity{% endif %}">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6>{{ sensor.name }}</h6>
+            {% if sensor.is_active %}
+                <span class="badge bg-light text-dark">Aktif</span>
+            {% else %}
+                 <span class="badge bg-secondary">Pasif</span>
+            {% endif %}
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                {% if reading %}
+                    <h3>
+                        {% if 'temperature' in reading.value %}
+                            {{ reading.value.temperature|floatformat:1 }}°C
+                        {% elif 'humidity' in reading.value %}
+                             {{ reading.value.humidity|floatformat:0 }}%
+                        {% else %}
+                            <!-- İlk değeri göster -->
+                            {{ reading.value.values|first }}
+                        {% endif %}
+                    </h3>
+                {% else %}
+                    <h3>-</h3>
+                {% endif %}
+                <small>{{ sensor.device.name }}</small>
+            </div>
+            <div class="text-end">
+                <i class="fas fa-thermometer-half fa-2x"></i>
+                <br>
+                <button class="btn btn-sm btn-outline-light mt-2" disabled>Düzenle</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endwith %}
