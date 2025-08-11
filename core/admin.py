@@ -1,6 +1,7 @@
 from django.contrib import admin
 from rest_framework.authtoken.models import Token
 from .models import (
+    Alert,
     Device, 
     Sensor, 
     SensorReading, 
@@ -56,3 +57,8 @@ class RuleAdmin(admin.ModelAdmin):
     inlines = [ConditionInline, ActionInline]
     readonly_fields = ('last_triggered',)
 
+@admin.register(Alert)
+class AlertAdmin(admin.ModelAdmin):
+    list_display = ('rule', 'device', 'severity', 'is_acknowledged', 'timestamp')
+    list_filter = ('severity', 'is_acknowledged', 'device')
+    readonly_fields = ('rule', 'timestamp', 'message', 'device')

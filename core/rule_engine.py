@@ -1,7 +1,7 @@
 import operator
 from django.conf import settings
 from django.core.mail import send_mail
-from .models import Rule
+from .models import Alert, Rule
 from django.utils import timezone
 from datetime import timedelta
 
@@ -14,9 +14,32 @@ OPS = {
 
 def execute_actions_for_rule(rule, context):
     """
-    Bir kural için tanımlanmış tüm eylemleri çalıştırır.
-    Bu fonksiyon artık 2 argüman alıyor: 'rule' ve 'context'.
+    Bir kural için tanımlanmış tüm eylemleri çalıştırır ve bir Alert kaydı oluşturur.
     """
+    
+    # 1. Alert (Uyarı) kaydını veritabanına oluştur
+    # Bu mesaj, hem Alert kaydında hem de e-postada kullanılabilir.
+    alert_message = (
+        f"{context.get('device_name', 'Bilinmeyen Cihaz')} cihazındaki "
+        f"{context.get('sensor_name', 'Bilinmeyen Sensör')} sensöründe kural tetiklendi. "
+        f"Gelen Değerler: {context}"
+    )
+
+    try:
+        Alert.objects.create(
+            rule=rule,
+            device=rule.trigger_sensor.device,
+            message=alert_message,
+            # Kuralın adına bakarak önem derecesini belirleyebiliriz.
+            # Örneğin, kural adı "Kritik" içeriyorsa, önem derecesi de kritik olur.
+            severity='critical' if 'kritik' in rule.name.lower() else 'warning'
+        )
+        print(f"  -> BİLGİ: Veritabanına uyarı kaydı oluşturuldu.")
+    except Exception as e:
+        print(f"  -> HATA: Uyarı kaydı oluşturulamadı: {e}")
+
+
+    # 2. Tanımlanmış eylemleri (e-posta vb.) çalıştır
     for action in rule.actions.all():
         if action.action_type == 'log_to_console':
             message_template = action.config.get('message', 'Eylem tetiklendi!')
@@ -26,12 +49,18 @@ def execute_actions_for_rule(rule, context):
         elif action.action_type == 'send_email':
             print(f"  -> EYLEM (E-posta): Tetikleniyor...")
             
+            # Mesaj şablonunu al ve dinamik verilerle doldur
             subject_template = action.config.get('subject', 'SNOW IOT Uyarısı: {rule_name}')
-            body_template = action.config.get('body', 'Cihaz: {device_name}\nSensör: {sensor_name}\nSıcaklık: {temperature}\nNem: {humidity}')
+            body_template = action.config.get('body', 'Cihaz: {device_name}\nSensör: {sensor_name}\n\nDetaylar:\n{value_details}')
             
+            # Gelen tüm verileri daha okunaklı bir string'e çevirelim
+            value_details_str = "\n".join([f"- {key.capitalize()}: {value}" for key, value in context.items() if key not in ['rule_name', 'sensor_name', 'device_name']])
+            context['value_details'] = value_details_str
+
             subject = subject_template.format(**context)
             body = body_template.format(**context)
 
+            # Eyleme atanmış ve aktif olan tüm alıcıların e-posta adreslerini al
             recipient_list = [
                 recipient.address for recipient in action.recipients.filter(is_active=True, recipient_type='email')
             ]
@@ -39,11 +68,11 @@ def execute_actions_for_rule(rule, context):
             if not recipient_list:
                 print("     -> UYARI: E-posta eylemi için aktif alıcı bulunamadı.")
                 continue
+
             try:
                 send_mail(
                     subject=subject,
                     message=body,
-                    # YENİ: from_email'i ayarlardan al
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=recipient_list,
                     fail_silently=False,
@@ -51,6 +80,7 @@ def execute_actions_for_rule(rule, context):
                 print(f"     -> Başarılı: E-posta {', '.join(recipient_list)} adres(ler)ine gönderildi.")
             except Exception as e:
                 print(f"     -> ❌ HATA: E-posta gönderilemedi: {e}")
+
 
 def process_rules_for_reading(reading_instance):
     """
@@ -113,3 +143,4 @@ def process_rules_for_reading(reading_instance):
                 context.update(reading_instance.value)
             
             execute_actions_for_rule(rule, context)
+

@@ -140,6 +140,38 @@ class NotificationRecipient(models.Model):
         verbose_name = "Bildirim Alıcısı"
         verbose_name_plural = "Bildirim Alıcıları"
 
+class Alert(models.Model):
+    """
+    Kural motoru tarafından tetiklenen her bir uyarıyı kaydeder.
+    """
+    SEVERITY_CHOICES = [
+        ('info', 'Bilgi'),
+        ('warning', 'Uyarı'),
+        ('critical', 'Kritik'),
+    ]
+    
+    # Hangi kuralın bu uyarıyı tetiklediği
+    rule = models.ForeignKey(Rule, on_delete=models.SET_NULL, null=True, verbose_name="Tetikleyen Kural")
+    # Uyarının ne zaman oluştuğu
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    # Uyarının içeriği
+    message = models.TextField(verbose_name="Uyarı Mesajı")
+    # Görüldü/Çözüldü olarak işaretlendi mi?
+    is_acknowledged = models.BooleanField(default=False, verbose_name="Görüldü mü?")
+    # Uyarının önemi
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='warning', verbose_name="Önem Derecesi")
+    
+    # Hangi cihazla ilgili olduğu
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return f"[{self.get_severity_display()}] {self.rule.name if self.rule else 'Bilinmeyen Kural'} @ {self.timestamp.strftime('%d.%m.%Y %H:%M')}"
+
+    class Meta:
+        verbose_name = "Uyarı"
+        verbose_name_plural = "Uyarılar"
+        ordering = ['-timestamp']
+
 class Action(models.Model):
     """
     Bir kuralın koşulları sağlandığında çalıştırılacak eylemi tanımlar.

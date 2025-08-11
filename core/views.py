@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 # Modelleri import ediyoruz
-from .models import Device, Sensor, SensorReading
+from .models import Alert, Device, Sensor, SensorReading
 
 # TÜM serializer'ları tek bir yerden, doğru dosyadan import ediyoruz
 from .serializers import (
@@ -152,7 +152,16 @@ class MapView(LoginRequiredMixin, View):
 class AlertsView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
     def get(self, request):
-        return render(request, 'alerts.html', {})
+        # Tüm çözülmemiş (acknowledged=False) uyarıları al
+        active_alerts = Alert.objects.filter(is_acknowledged=False).select_related('rule', 'device')
+        # Tüm uyarıları (geçmiş) al
+        all_alerts = Alert.objects.all().select_related('rule', 'device')[:50] # Son 50 taneyi göster
+        
+        context = {
+            'active_alerts': active_alerts,
+            'alert_history': all_alerts,
+        }
+        return render(request, 'alerts.html', context)
 
 class SettingsView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
