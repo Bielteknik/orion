@@ -239,3 +239,8 @@ class SettingsView(LoginRequiredMixin, View):
     def get(self, request):
         context = {}
         return render(request, 'settings.html', context)
+    
+class SimpleReadingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SensorReading
+        fields = ['value', 'timestamp']

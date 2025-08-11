@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from core.views import SimpleReadingSerializer
 from .models import Device, Sensor, SensorReading
 
 class SensorSerializer(serializers.ModelSerializer):
@@ -38,9 +40,20 @@ class SensorReadingSerializer(serializers.ModelSerializer):
 
 class DeviceSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()
+    # YENİ: Her cihazın son okumasını da API'ye ekleyelim
+    last_reading = serializers.SerializerMethodField()
     
     class Meta:
         model = Device
-        # Yeni alanları ekle
-        fields = ['id', 'name', 'location', 'latitude', 'longitude', 'is_active', 'user']
-        read_only_fields = ['id', 'user']
+        fields = [
+            'id', 'name', 'location', 'latitude', 'longitude', 
+            'is_active', 'user', 'last_reading'
+        ]
+        read_only_fields = ['id', 'user', 'last_reading']
+
+    def get_last_reading(self, obj):
+        """Cihaza ait en son sensör okumasını bulur ve serileştirir."""
+        last_reading = SensorReading.objects.filter(sensor__device=obj).order_by('-timestamp').first()
+        if last_reading:
+            return SimpleReadingSerializer(last_reading).data
+        return None

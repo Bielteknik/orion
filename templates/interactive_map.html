@@ -5,14 +5,106 @@
 {% block content %}
 <div id="map" class="page-content active">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title"><i class="fas fa-map me-2"></i>İnteraktif Harita</h2>
+        <h2 class="page-title"><i class="fas fa-map-marked-alt me-2"></i>İnteraktif Harita</h2>
     </div>
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle me-2"></i>
-        Bu özellik yakında aktif olacaktır. Burada, tüm istasyonlarınızı canlı verilerle birlikte interaktif bir harita üzerinde görebileceksiniz.
-    </div>
-    <div id="mainMap" class="map-container bg-light border">
-        <!-- Harita buraya yüklenecek -->
+
+    <div class="glass-card">
+        <div id="mainMap" class="map-container" style="height: 70vh;">
+            <div id="map-loading" class="d-flex justify-content-center align-items-center h-100">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Yükleniyor...</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let map;
+    const initialCoords = [39.90, 41.27]; // Erzurum merkezi
+
+    function initializeMap() {
+        if (map) return; // Harita zaten başlatılmışsa tekrar başlatma
+
+        map = L.map('mainMap').setView(initialCoords, 9);
+        
+        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map); // Varsayılan katman
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; Esri'
+        });
+
+        const baseMaps = {
+            "Sokak Haritası": streetLayer,
+            "Uydu Görüntüsü": satelliteLayer
+        };
+
+        L.control.layers(baseMaps).addTo(map);
+
+        // API'den istasyon verilerini çek ve haritaya ekle
+        fetchStations();
+    }
+
+    function fetchStations() {
+        fetch('/api/v3/devices/')
+            .then(response => response.json())
+            .then(devices => {
+                // Yükleniyor spinner'ını kaldır
+                document.getElementById('map-loading').style.display = 'none';
+                
+                devices.forEach(device => {
+                    // Sadece konumu olan cihazları haritaya ekle
+                    if (device.latitude && device.longitude) {
+                        const marker = L.marker([device.latitude, device.longitude]).addTo(map);
+                        marker.bindPopup(createPopupContent(device));
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('İstasyon verileri çekilirken hata oluştu:', error);
+                document.getElementById('map-loading').innerHTML = '<div class="alert alert-danger">Veriler yüklenemedi.</div>';
+            });
+    }
+
+    function createPopupContent(device) {
+        let statusBadge = device.is_active 
+            ? '<span class="badge bg-success">Aktif</span>' 
+            : '<span class="badge bg-danger">Pasif</span>';
+
+        let dataHtml = '<p class="text-muted mt-2">Henüz veri yok.</p>';
+        if (device.last_reading && device.last_reading.value) {
+            const reading = device.last_reading.value;
+            const temp = reading.temperature !== undefined ? `${reading.temperature.toFixed(1)}°C` : '-';
+            const hum = reading.humidity !== undefined ? `${Math.round(reading.humidity)}%` : '-';
+            const dist = reading.distance_cm !== undefined ? `${reading.distance_cm.toFixed(1)} cm` : '-';
+            const weight = reading.value !== undefined && reading.value.value !== undefined ? `${reading.value.value.toFixed(2)} kg` : '-';
+            
+            dataHtml = `
+                <div style="font-size: 0.9em;">
+                    <p class="mb-1"><strong>Sıcaklık:</strong> ${temp}</p>
+                    <p class="mb-1"><strong>Nem:</strong> ${hum}</p>
+                    <p class="mb-1"><strong>Mesafe:</strong> ${dist}</p>
+                    <p class="mb-1"><strong>Ağırlık:</strong> ${weight}</p>
+                </div>
+            `;
+        }
+        
+        return `
+            <div>
+                <h6 class="mb-1">${device.name}</h6>
+                <p class="mb-2"><small class="text-muted">${device.location || ''}</small> ${statusBadge}</p>
+                ${dataHtml}
+            </div>
+        `;
+    }
+
+    // Haritayı hemen başlat
+    initializeMap();
+});
+</script>
+{% endblock extra_js %}
