@@ -33,8 +33,6 @@ class SensorReadingAdmin(admin.ModelAdmin):
     list_filter = ('sensor__device', 'sensor', 'timestamp')
     readonly_fields = ('sensor', 'value', 'timestamp')
 
-# --- YENİ EKLENEN VE DÜZELTİLEN KISIM ---
-
 @admin.register(NotificationRecipient)
 class NotificationRecipientAdmin(admin.ModelAdmin):
     list_display = ('name', 'recipient_type', 'address', 'is_active')
@@ -52,6 +50,9 @@ class ActionInline(admin.TabularInline):
 
 @admin.register(Rule)
 class RuleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'trigger_sensor', 'is_active', 'description')
+    # YENİ ALANLARI LİSTEYE EKLE
+    list_display = ('name', 'trigger_sensor', 'is_active', 'cooldown_minutes', 'last_triggered')
     list_filter = ('is_active', 'trigger_sensor__device')
     inlines = [ConditionInline, ActionInline]
+    readonly_fields = ('last_triggered',)
+

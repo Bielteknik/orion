@@ -1,6 +1,9 @@
 import operator
+from django.conf import settings
 from django.core.mail import send_mail
 from .models import Rule
+from django.utils import timezone
+from datetime import timedelta
 
 # Python'daki karşılaştırma operatörlerini bir sözlükte tutalım
 OPS = {
@@ -36,22 +39,23 @@ def execute_actions_for_rule(rule, context):
             if not recipient_list:
                 print("     -> UYARI: E-posta eylemi için aktif alıcı bulunamadı.")
                 continue
-
             try:
                 send_mail(
                     subject=subject,
                     message=body,
-                    from_email='noreply@snowiot.com',
+                    # YENİ: from_email'i ayarlardan al
+                    from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=recipient_list,
                     fail_silently=False,
                 )
-                print(f"     -> Başarılı: E-posta {', '.join(recipient_list)} adres(ler)ine gönderildi (konsola yazdırıldı).")
+                print(f"     -> Başarılı: E-posta {', '.join(recipient_list)} adres(ler)ine gönderildi.")
             except Exception as e:
                 print(f"     -> ❌ HATA: E-posta gönderilemedi: {e}")
 
 def process_rules_for_reading(reading_instance):
     """
     Verilen bir sensör okuması için ilgili tüm kuralları kontrol eder ve eylemleri tetikler.
+    Artık "cooldown" (susturma) mekanizması içerir.
     """
     sensor = reading_instance.sensor
     rules_to_check = Rule.objects.filter(
@@ -65,28 +69,41 @@ def process_rules_for_reading(reading_instance):
     print(f"--- Kural Motoru: {sensor.name} sensöründen gelen veri için {rules_to_check.count()} kural kontrol ediliyor ---")
 
     for rule in rules_to_check:
+        # --- YENİ: COOLDOWN KONTROLÜ ---
+        if rule.last_triggered:
+            # Kuralın tekrar tetiklenebilmesi için geçmesi gereken zaman
+            cooldown_period = timedelta(minutes=rule.cooldown_minutes)
+            # Ne zaman tekrar aktif olacağı
+            next_trigger_time = rule.last_triggered + cooldown_period
+            
+            # Eğer hala susturma periyodu içindeysek, bu kuralı atla
+            if timezone.now() < next_trigger_time:
+                print(f"ℹ️  KURAL SUSTURULDU: '{rule.name}' kuralı {next_trigger_time.strftime('%H:%M')} saatine kadar tekrar tetiklenmeyecek.")
+                continue # Bir sonraki kurala geç
+        # --- KONTROL BİTTİ ---
+
         all_conditions_met = True
         for condition in rule.conditions.all():
+            # ... (koşul kontrol mantığı aynı kalıyor) ...
             variable_key = condition.variable_key
             if variable_key not in reading_instance.value:
-                all_conditions_met = False
-                break
-            
+                all_conditions_met = False; break
             try:
                 current_value = float(reading_instance.value[variable_key])
                 comparison_value = float(condition.comparison_value)
                 op_func = OPS.get(condition.operator)
                 if not op_func or not op_func(current_value, comparison_value):
-                    all_conditions_met = False
-                    break
+                    all_conditions_met = False; break
             except (ValueError, TypeError):
-                 print(f"UYARI: Kural '{rule.name}', koşul '{condition}' sayısal olmayan değerler içeriyor, atlanıyor.")
-                 all_conditions_met = False
-                 break
+                 all_conditions_met = False; break
 
         if all_conditions_met:
             print(f"✅ KURAL TETİKLENDİ: '{rule.name}'")
             
+            # YENİ: Kural tetiklendiği anda, son tetiklenme zamanını güncelle
+            rule.last_triggered = timezone.now()
+            rule.save(update_fields=['last_triggered'])
+
             context = {
                 'rule_name': rule.name,
                 'sensor_name': sensor.name,
@@ -95,5 +112,4 @@ def process_rules_for_reading(reading_instance):
             if isinstance(reading_instance.value, dict):
                 context.update(reading_instance.value)
             
-            # Çağrı yapılan yerdeki argüman sayısı ile fonksiyon tanımındaki argüman sayısı artık eşleşiyor.
             execute_actions_for_rule(rule, context)

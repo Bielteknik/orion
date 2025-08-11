@@ -86,4 +86,16 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# --- E-POSTA AYARLARI (Şirket Maili için) ---
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'mail.ejder3200.com'      # KENDİ SMTP SUNUCU ADRESİNİZİ GİRİN
+EMAIL_PORT = 465                        # GENELLİKLE 587'DİR, DEĞİLSE DEĞİŞTİRİN
+EMAIL_USE_TLS = False                   # PORT 587 İSE BU True OLMALI
+EMAIL_USE_SSL = True                    # PORT 465 İSE BU True, EMAIL_USE_TLS False OLMALI
+
+# DİKKAT: Kendi bilgilerinizi buraya girin.
+EMAIL_HOST_USER = 'kenandemir@ejder3200.com'  # TAM E-POSTA ADRESİNİZ
+EMAIL_HOST_PASSWORD = 'HjDm?zvd6jP-'     # E-POSTA ŞİFRENİZ
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_TIMEOUT = 20

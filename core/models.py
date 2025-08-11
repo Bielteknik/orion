@@ -82,6 +82,9 @@ class Rule(models.Model):
     # Bu kural, hangi sensörden veri geldiğinde kontrol edilmeli?
     trigger_sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE, verbose_name="Tetikleyici Sensör")
     is_active = models.BooleanField(default=True, verbose_name="Aktif mi?")
+    # YENİ ALANLAR
+    last_triggered = models.DateTimeField(null=True, blank=True, verbose_name="Son Tetiklenme Zamanı")
+    cooldown_minutes = models.PositiveIntegerField(default=60, verbose_name="Tekrar Bildirme Sıklığı (Dakika)")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
