@@ -1,20 +1,23 @@
+from django.contrib.auth.models import User
+from django.utils.crypto import get_random_string
+import json
 from django.shortcuts import render
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Avg, Max, Min
-import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework import status
+from rest_framework import viewsets, status
 
 from .models import Device, Sensor, SensorReading
-from .serializers import DeviceConfigSerializer, SensorReadingSerializer
+from .serializers import DeviceConfigSerializer, SensorReadingSerializer, DeviceSerializer
 
 from .rule_engine import process_rules_for_reading
+from core import serializers
 
 class DeviceConfigView(APIView):
     """
@@ -176,4 +179,30 @@ class SensorsView(LoginRequiredMixin, View):
         }
         return render(request, 'sensors.html', context)  
 
+class DeviceViewSet(viewsets.ModelViewSet):
+    queryset = Device.objects.all()
+    serializer_class = DeviceSerializer
+    # Bu view'e sadece admin panelinden giriş yapmış (staff) kullanıcılar erişebilir.
+    # permission_classes = [permissions.IsAdminUser] 
+    # Şimdilik tüm yetkili kullanıcılar erişsin:
+    permission_classes = [IsAuthenticated]
 
+    def perform_create(self, serializer):
+        """ Yeni bir cihaz oluşturulurken otomatik olarak bir kullanıcı da oluşturur. """
+        device_name = serializer.validated_data.get('name')
+        
+        # 1. Benzersiz bir kullanıcı adı oluştur
+        base_username = f"device_{device_name.lower().replace(' ', '_').replace('-', '_')}"
+        username = base_username
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}_{counter}"
+            counter += 1
+        
+        # 2. Yeni kullanıcıyı oluştur
+        # DÜZELTME: get_random_string ile güvenli bir şifre oluşturuyoruz.
+        password = get_random_string(length=12)
+        user = User.objects.create_user(username=username, password=password)
+
+        # 3. Cihazı bu yeni kullanıcıya atayarak kaydet
+        serializer.save(user=user)

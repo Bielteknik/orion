@@ -1,60 +1,200 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}İstasyonlar - {{ block.super }}{% endblock title %}
 
 {% block content %}
 <div id="stations" class="page-content active">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title">
-            <i class="fas fa-building me-2"></i>İstasyonlar
-        </h2>
-        <button class="btn btn-gradient" disabled>
-            <i class="fas fa-plus me-2"></i>Yeni İstasyon (Yakında)
+        <h2 class="page-title"><i class="fas fa-building me-2"></i>İstasyonlar</h2>
+        <button class="btn btn-gradient" id="addStationBtn">
+            <i class="fas fa-plus me-2"></i>Yeni İstasyon
         </button>
     </div>
 
-    <div class="row">
+    <div class="row" id="station-list">
         {% for device_info in devices_with_readings %}
-        <div class="col-md-6 mb-4">
-            <div class="glass-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 style="color: var(--dark-color); font-weight: 600;">{{ device_info.device.name }}</h5>
-                    {% if device_info.device.is_active %}
-                        <span class="badge bg-success">Aktif</span>
-                    {% else %}
-                        <span class="badge bg-danger">Pasif</span>
-                    {% endif %}
-                </div>
-                <div class="row" style="color: var(--text-light);">
-                    <div class="col-6">
-                        <p><i class="fas fa-map-marker-alt me-2" style="color: var(--accent-color);"></i>Konum: {{ device_info.device.location|default:"-" }}</p>
-                        <p><i class="fas fa-clock me-2" style="color: var(--accent-color);"></i>Son Görülme: {{ device_info.device.last_seen|date:"d.m.Y H:i" }}</p>
-                    </div>
-                    <div class="col-6">
-                        {% with reading=device_info.last_reading %}
-                            {% if reading %}
-                                <p><i class="fas fa-thermometer-half me-2" style="color: var(--accent-color);"></i>Sıcaklık: {{ reading.value.temperature|floatformat:1 }}°C</p>
-                                <p><i class="fas fa-tint me-2" style="color: var(--accent-color);"></i>Nem: {{ reading.value.humidity|floatformat:0 }}%</p>
-                            {% else %}
-                                <p><i class="fas fa-thermometer-half me-2" style="color: var(--accent-color);"></i>Sıcaklık: -</p>
-                                <p><i class="fas fa-tint me-2" style="color: var(--accent-color);"></i>Nem: -</p>
-                            {% endif %}
-                        {% endwith %}
-                    </div>
-                </div>
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-light me-2" disabled>Detay</button>
-                    <button class="btn btn-sm btn-outline-light me-2" disabled>Ayarlar</button>
-                    <button class="btn btn-sm btn-outline-light" disabled>Kamera</button>
-                </div>
-            </div>
-        </div>
+            {% include 'partials/_station_card.html' with device_info=device_info %}
         {% empty %}
-        <div class="col-12">
-            <div class="alert alert-info">Sistemde henüz görüntülenecek bir istasyon (cihaz) bulunmuyor.</div>
-        </div>
+            <div id="no-stations-alert" class="col-12">
+                <div class="alert alert-info">Sistemde henüz görüntülenecek bir istasyon bulunmuyor.</div>
+            </div>
         {% endfor %}
     </div>
 </div>
+
+<!-- Yeni İstasyon Ekleme/Düzenleme Modal'ı -->
+<div class="modal fade" id="stationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stationModalLabel">Yeni İstasyon Ekle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="stationForm" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" id="stationId" name="stationId">
+                    <div class="mb-3">
+                        <label for="stationName" class="form-label">İstasyon Adı *</label>
+                        <input type="text" class="form-control" id="stationName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="stationLocation" class="form-label">Konum Açıklaması</label>
+                        <input type="text" class="form-control" id="stationLocation" placeholder="Örn: Erzurum - Palandöken">
+                    </div>
+                    
+                    <!-- Harita Alanı -->
+                    <div class="mb-3">
+                        <label class="form-label">Haritadan Konum Seç (İsteğe Bağlı)</label>
+                        <div id="map-container" style="height: 300px; border-radius: 8px;"></div>
+                        <input type="hidden" id="latitude">
+                        <input type="hidden" id="longitude">
+                    </div>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="stationIsActive" checked>
+                        <label class="form-check-label" for="stationIsActive">İstasyon Aktif</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-primary" id="saveStationBtn">Kaydet</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stationModalEl = document.getElementById('stationModal');
+    const stationModal = new bootstrap.Modal(stationModalEl);
+    const form = document.getElementById('stationForm');
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    let map = null;
+    let marker = null;
+    const initialCoords = [39.90, 41.27]; // Erzurum merkezi
+
+    // "Yeni İstasyon" butonuna tıklama olayı
+    document.getElementById('addStationBtn').addEventListener('click', function() {
+        form.reset();
+        document.getElementById('stationId').value = '';
+        document.getElementById('stationModalLabel').textContent = 'Yeni İstasyon Ekle';
+        document.getElementById('stationIsActive').checked = true;
+        stationModal.show();
+    });
+    
+    // Modal açıldığında haritayı başlat/ayarla
+    stationModalEl.addEventListener('shown.bs.modal', function () {
+        if (!map) {
+            map = L.map('map-container').setView(initialCoords, 10);
+            const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            });
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; Esri'
+            });
+             const terrainLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenTopoMap'
+            });
+
+            const baseMaps = {
+                "Sokak": streetLayer,
+                "Uydu": satelliteLayer,
+                "Arazi": terrainLayer
+            };
+            // Varsayılan olarak sokak katmanını ekle
+            streetLayer.addTo(map);
+            // Katman kontrolünü haritaya ekle
+            layerControl = L.control.layers(baseMaps).addTo(map);
+            } else {
+            map.invalidateSize(); // Modal içinde haritayı yeniden boyutlandır
+        }
+        
+        const lat = document.getElementById('latitude').value;
+        const lng = document.getElementById('longitude').value;
+        
+        if (marker) map.removeLayer(marker);
+
+        if (lat && lng) {
+            marker = L.marker([lat, lng]).addTo(map);
+            map.setView([lat, lng], 13);
+        } else {
+            map.setView(initialCoords, 10);
+        }
+
+        map.on('click', function(e) {
+            if (marker) map.removeLayer(marker);
+            marker = L.marker(e.latlng).addTo(map);
+            document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+            document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+        });
+    });
+
+    // Kaydet butonuna tıklama olayı
+    document.getElementById('saveStationBtn').addEventListener('click', function() {
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const stationId = document.getElementById('stationId').value;
+        const url = stationId ? `/api/v3/devices/${stationId}/` : '/api/v3/devices/';
+        const method = stationId ? 'PUT' : 'POST';
+
+        const latVal = document.getElementById('latitude').value;
+        const lonVal = document.getElementById('longitude').value;
+
+        const data = {
+            name: document.getElementById('stationName').value,
+            location: document.getElementById('stationLocation').value,
+            is_active: document.getElementById('stationIsActive').checked,
+            latitude: latVal ? parseFloat(latVal) : null,
+            longitude: lonVal ? parseFloat(lonVal) : null,
+        };
+
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify(data),
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Sunucu hatası!');
+            return response.json();
+        })
+        .then(result => {
+            stationModal.hide();
+            location.reload(); 
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Bir hata oluştu!');
+        });
+    });
+
+    // Düzenle butonlarına olay dinleyici ekle
+    document.querySelectorAll('.edit-station-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const stationId = this.dataset.id;
+            fetch(`/api/v3/devices/${stationId}/`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('stationId').value = data.id;
+                    document.getElementById('stationName').value = data.name;
+                    document.getElementById('stationLocation').value = data.location;
+                    document.getElementById('stationIsActive').checked = data.is_active;
+                    document.getElementById('latitude').value = data.latitude || '';
+                    document.getElementById('longitude').value = data.longitude || '';
+                    document.getElementById('stationModalLabel').textContent = 'İstasyon Düzenle';
+                    stationModal.show();
+                });
+        });
+    });
+});
+</script>
+{% endblock extra_js %}

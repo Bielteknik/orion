@@ -71,6 +71,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Tarayıcıdan giriş yapmış kullanıcıların AJAX istekleri için
+        'rest_framework.authentication.SessionAuthentication',
+        # Agent gibi harici uygulamaların token ile yaptığı istekler için
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [

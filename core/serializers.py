@@ -31,3 +31,12 @@ class SensorReadingSerializer(serializers.ModelSerializer):
         fields = ['sensor', 'value', 'timestamp']
         # timestamp alanı sunucu tarafından otomatik oluşturulacağı için sadece okunabilir.
         read_only_fields = ['timestamp']
+
+class DeviceSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
+    
+    class Meta:
+        model = Device
+        # Yeni alanları ekle
+        fields = ['id', 'name', 'location', 'latitude', 'longitude', 'is_active', 'user']
+        read_only_fields = ['id', 'user']

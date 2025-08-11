@@ -6,7 +6,12 @@ class Device(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="Cihaz Sahibi")
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True, verbose_name="Cihaz Adı")
-    location = models.CharField(max_length=200, blank=True, verbose_name="Konum")
+
+    # YENİ ALANLAR
+    location = models.CharField(max_length=200, blank=True, verbose_name="Konum")    
+    latitude = models.FloatField(null=True, blank=True, verbose_name="Enlem")
+    longitude = models.FloatField(null=True, blank=True, verbose_name="Boylam")
+
     is_active = models.BooleanField(default=True, verbose_name="Aktif mi?")
     last_seen = models.DateTimeField(null=True, blank=True, verbose_name="Son Görülme")
     health_status = models.JSONField(null=True, blank=True, default=dict, verbose_name="Sağlık Durumu")
