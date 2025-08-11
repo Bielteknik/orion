@@ -1,14 +1,24 @@
 import configparser
 import json
 import os
+import re
 import sqlite3
 import sys
 import time
-import importlib # Sürücüleri dinamik olarak yüklemek için
+import subprocess
+import importlib
 from apscheduler.schedulers.blocking import BlockingScheduler
 import requests
 
-# --- Donanım Kütüphaneleri (Sadece sürücüler tarafından kullanılacak) ---
+# --- Donanım Kütüphaneleri ---
+# Bu kütüphaneler sadece Raspberry Pi üzerinde bulunur.
+# Hata vermemesi için try-except bloğu içinde import ediyoruz.
+try:
+    import serial
+    PYSERIAL_AVAILABLE = True
+except ImportError:
+    PYSERIAL_AVAILABLE = False
+
 try:
     from smbus2 import SMBus, i2c_msg
     SMBUS_AVAILABLE = True
@@ -17,29 +27,88 @@ except (ImportError, ModuleNotFoundError):
 
 # --- Ana Orkestra Şefi Sınıfı ---
 class OrionAgent:
+    """
+    Orion Projesi v3.0 için ana istemci.
+    Sensörleri sunucudan aldığı dinamik konfigürasyona göre okur,
+    işler, çevrimdışı durumları yönetir ve sunucuya gönderir.
+    """
     def __init__(self, config_file='config.ini'):
-        # ... (init metodu bir önceki versiyonla aynı, SADECE self.reading_cache = {} satırını bırak) ...
         print("--- Orion Agent Başlatılıyor ---")
         self.is_configured = False
+        
+        # 1. Yerel konfigürasyonu yükle
         local_config = self._load_ini_config(config_file)
-        if not local_config: return
+        if not local_config:
+            return
+
         self.base_url = local_config['server']['base_url']
         self.token = local_config['device']['token']
         self.headers = {'Authorization': f'Token {self.token}', 'Content-Type': 'application/json'}
+        
+        # 2. Yerel veritabanını (çevrimdışı kuyruk) hazırla
         self.db_path = os.path.join(os.path.dirname(__file__), 'offline_queue.db')
-        if not self._init_local_db(): return
+        if not self._init_local_db():
+            return
+            
+        # 3. Agent'ın çalışma zamanı değişkenlerini tanımla
         self.device_config = None
         self.scheduler = BlockingScheduler(timezone="Europe/Istanbul")
         self.reading_cache = {}
+        
         self.is_configured = True
         print("✅ Agent başlatılmaya hazır.")
 
-    # ... (_load_ini_config, _init_local_db, get_server_configuration,
-    #      _send_data_to_server, _queue_data_locally, _process_offline_queue
-    #      fonksiyonları BİREBİR AYNI KALIYOR) ...
+    # --- Başlangıç ve Yapılandırma Metotları ---
+    
+    def _load_ini_config(self, config_file):
+        print(f"Yerel konfigürasyon okunuyor: {config_file}")
+        try:
+            parser = configparser.ConfigParser()
+            if not parser.read(config_file, encoding='utf-8'):
+                raise FileNotFoundError(f"{config_file} bulunamadı veya boş.")
+            return {s: dict(parser.items(s)) for s in parser.sections()}
+        except Exception as e:
+            print(f"❌ HATA: Yerel konfigürasyon okunamadı! {e}")
+            return None
+
+    def _init_local_db(self):
+        print("Yerel çevrimdışı kuyruk veritabanı kontrol ediliyor...")
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS readings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    payload TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+            conn.close()
+            print("✅ Veritabanı hazır.")
+            return True
+        except Exception as e:
+            print(f"❌ HATA: Yerel veritabanı oluşturulamadı: {e}")
+            return False
+
+    def get_server_configuration(self):
+        print("\n📡 Sunucudan cihaz yapılandırması isteniyor...")
+        try:
+            response = requests.get(f"{self.base_url}/api/v3/device/config/", headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                self.device_config = response.json()
+                print("✅ Yapılandırma başarıyla alındı.")
+                return True
+            else:
+                print(f"❌ HATA: Yapılandırma alınamadı. Sunucu: {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            print(f"❌ HATA: Sunucuya bağlanılamadı! {e}")
+            return False
+
+    # --- Ana Çalışma Döngüsü ---
 
     def master_read_cycle(self):
-        # ... (bu fonksiyonun yapısı aynı kalıyor, sadece _read_all_physical_sensors çağrısı var) ...
         ts = time.strftime('%Y-%m-%d %H:%M:%S')
         print(f"\n🔄 ({ts}) Ana okuma döngüsü başladı.")
         self._process_offline_queue()
@@ -55,31 +124,31 @@ class OrionAgent:
             payload = {"sensor": sensor_id, "value": value}
             print(f"   -> {json.dumps(payload)}")
             success, message = self._send_data_to_server(payload)
-            if success: print(f"   -> ✅ Başarılı.")
+            if success:
+                print(f"   -> ✅ Başarılı.")
             else:
                 print(f"   -> ❌ Başarısız: {message}. Veri kuyruğa alınıyor.")
                 self._queue_data_locally(payload)
         print("--- Gönderim Tamamlandı ---")
+
+    # --- Sensör Okuma Motoru (Artık Sürücüleri Çağırıyor) ---
     
-    # GÜNCELLENDİ: Bu fonksiyon artık sürücüleri çağırıyor.
     def _read_all_physical_sensors(self):
         sensors = [s for s in self.device_config.get('sensors', []) if s.get('is_active') and s.get('interface') != 'virtual']
         
         for sensor_config in sensors:
             print(f"  -> İşleniyor: {sensor_config['name']}")
             
-            # 1. Sürücüyü Bul ve Yükle
+            # 1. Sürücüyü Bul ve Yükle (Eğer belirtilmişse)
             driver_name = sensor_config.get('parser_config', {}).get('driver')
-            
             data = None
+
             if driver_name:
                 try:
-                    # 'drivers.hx711_load_cell' gibi bir modülü dinamik olarak import et
                     driver_module = importlib.import_module(f"drivers.{driver_name}")
-                    # Sürücünün read() fonksiyonunu çağır
                     data = driver_module.read(sensor_config.get('config', {}))
                 except ImportError:
-                    print(f"     -> HATA: Sürücü bulunamadı: '{driver_name}.py'")
+                    print(f"     -> HATA: Sürücü bulunamadı: 'drivers/{driver_name}.py'")
                 except Exception as e:
                     print(f"     -> HATA: Sürücü çalışırken hata oluştu: {e}")
             
@@ -96,7 +165,6 @@ class OrionAgent:
             else:
                 print("     -> Veri okunamadı.")
                 
-    # _read_i2c fonksiyonu aynı kalabilir veya o da kendi sürücüsüne taşınabilir. Şimdilik kalsın.
     def _read_i2c(self, config):
         if not SMBUS_AVAILABLE: return None
         addr = config.get('address'); bus_n = config.get('bus', 1)
@@ -113,8 +181,43 @@ class OrionAgent:
         except (OSError, ValueError) as e:
             print(f"     -> HATA: I2C sensöründen okunamadı ({addr}): {e}"); return None
 
+    # --- Çevrimdışı Kuyruk ve Sunucu İletişimi ---
+
+    def _send_data_to_server(self, payload):
+        try:
+            r = requests.post(f"{self.base_url}/api/v3/readings/submit/", headers=self.headers, json=payload, timeout=10)
+            return (True, "OK") if r.status_code == 201 else (False, f"Sunucu Hatası {r.status_code}")
+        except requests.exceptions.RequestException as e: return False, "Bağlantı Hatası"
+
+    def _queue_data_locally(self, payload):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.cursor().execute("INSERT INTO readings (payload) VALUES (?)", (json.dumps(payload),))
+            conn.commit(); conn.close()
+        except Exception as e: print(f"   -> ❌ HATA: Veri yerel kuyruğa eklenemedi: {e}")
+
+    def _process_offline_queue(self):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            items = cursor.execute("SELECT id, payload FROM readings ORDER BY id ASC").fetchall()
+            if items:
+                print(f"\n📬 Çevrimdışı kuyrukta {len(items)} kayıt var, gönderiliyor...")
+                for item in items:
+                    success, msg = self._send_data_to_server(json.loads(item['payload']))
+                    if success:
+                        print(f"   -> Kuyruk (ID: {item['id']}) gönderildi.")
+                        cursor.execute("DELETE FROM readings WHERE id = ?", (item['id'],))
+                        conn.commit()
+                    else:
+                        print("   -> Sunucuya ulaşılamıyor, kuyruk işlemi durduruldu."); break
+            conn.close()
+        except Exception as e: print(f"   -> ❌ HATA: Kuyruk işlenemedi: {e}")
+
+    # --- Ana Çalıştırma Fonksiyonu ---
+
     def run(self):
-        # ... (run metodu aynı kalıyor) ...
         if not self.is_configured: sys.exit("❌ Agent, yerel konfigürasyon hatası nedeniyle başlatılamıyor.")
         if not self.get_server_configuration(): sys.exit("❌ Agent, sunucuya bağlanamadığı için başlatılamıyor.")
         run_interval = 10
@@ -127,6 +230,33 @@ class OrionAgent:
         except (KeyboardInterrupt, SystemExit):
             print("\n🛑 Agent durduruluyor..."); self.scheduler.shutdown()
 
+# --- Script Başlangıç Kısmı ---
+
+def check_and_install_dependencies():
+    """ Gerekli temel kütüphanelerin yüklü olup olmadığını kontrol eder, eksikse yükler. """
+    base_dependencies = ['requests', 'apscheduler']
+    if sys.platform.startswith('linux'):
+        base_dependencies.extend(['pyserial', 'smbus2'])
+    
+    missing_packages = []
+    for package_name in base_dependencies:
+        try:
+            __import__(package_name)
+        except ImportError:
+            missing_packages.append(package_name)
+
+    if missing_packages:
+        print(f"\nEksik kütüphaneler bulundu: {', '.join(missing_packages)}. Yükleniyor...")
+        try:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', *missing_packages])
+            print("✅ Gerekli kütüphaneler başarıyla kuruldu.")
+            print("Lütfen script'i tekrar çalıştırın.")
+            sys.exit(0)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ HATA: Kütüphaneler yüklenemedi. Lütfen manuel yükleyin: 'pip install {' '.join(missing_packages)}'. Hata: {e}")
+            sys.exit(1)
+
 if __name__ == "__main__":
+    check_and_install_dependencies()
     agent = OrionAgent()
     agent.run()
