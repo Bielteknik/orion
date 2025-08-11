@@ -1,0 +1,50 @@
+bielteknik@MeteorologyPi4B:~/orion $ ls -l /dev/serial/by-path/
+total 0
+lrwxrwxrwx 1 root root 13 Aug 10 14:17 platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-port0 -> ../../ttyUSB0
+lrwxrwxrwx 1 root root 13 Aug 10 14:17 platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-port0 -> ../../ttyUSB1
+bielteknik@MeteorologyPi4B:~/orion $ 
+
+-----------
+bielteknik@MeteorologyPi4B:~/orion $ udevadm info -a -n /dev/ttyUSB0 | grep "KERNELS"
+    KERNELS=="ttyUSB0"
+    KERNELS=="1-1.1:1.0"
+    KERNELS=="1-1.1"
+    KERNELS=="1-1"
+    KERNELS=="usb1"
+    KERNELS=="0000:01:00.0"
+    KERNELS=="0000:00:00.0"
+    KERNELS=="pci0000:00"
+    KERNELS=="fd500000.pcie"
+    KERNELS=="scb"
+    KERNELS=="platform"
+-----------
+bielteknik@MeteorologyPi4B:~/orion $ udevadm info -a -n /dev/ttyUSB1 | grep "KERNELS"
+    KERNELS=="ttyUSB1"
+    KERNELS=="1-1.2:1.0"
+    KERNELS=="1-1.2"
+    KERNELS=="1-1"
+    KERNELS=="usb1"
+    KERNELS=="0000:01:00.0"
+    KERNELS=="0000:00:00.0"
+    KERNELS=="pci0000:00"
+    KERNELS=="fd500000.pcie"
+    KERNELS=="scb"
+    KERNELS=="platform"
+-----------
+
+-----------------------------
+bielteknik@MeteorologyPi4B:~/orion $ ls -l /dev/ttyMESAFE /dev/ttyAGIRLIK
+lrwxrwxrwx 1 root root 7 Aug 11 11:01 /dev/ttyAGIRLIK -> ttyUSB0
+lrwxrwxrwx 1 root root 7 Aug 11 11:01 /dev/ttyMESAFE -> ttyUSB1
+bielteknik@MeteorologyPi4B:~/orion $ 
+------------------------------------
+crw--w---- 1 bielteknik tty       4,  7 Aug 11 11:01 /dev/tty7
+crw--w---- 1 root       tty       4,  8 Aug 11 11:01 /dev/tty8
+crw--w---- 1 root       tty       4,  9 Aug 11 11:01 /dev/tty9
+lrwxrwxrwx 1 root       root          7 Aug 11 11:01 /dev/ttyAGIRLIK -> ttyUSB0
+lrwxrwxrwx 1 root       root          7 Aug 11 11:01 /dev/ttyMESAFE -> ttyUSB1
+crw------- 1 root       root      5,  3 Aug 11 11:01 /dev/ttyprintk
+crw-rw---- 1 root       dialout   4, 64 Aug 11 11:01 /dev/ttyS0
+crw-rw---- 1 root       dialout 188,  0 Aug 11 11:01 /dev/ttyUSB0
+crw-rw---- 1 root       dialout 188,  1 Aug 11 11:01 /dev/ttyUSB1
+bielteknik@MeteorologyPi4B:~/orion $ 

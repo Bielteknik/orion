@@ -1,257 +1,284 @@
-import configparser, requests, json, sys, time, os, sqlite3, re, struct
+import configparser
+import json
+import os
+import re
+import sqlite3
+import sys
+import time
+import subprocess
 from apscheduler.schedulers.blocking import BlockingScheduler
+import requests
 
+# --- Donanım Kütüphaneleri ---
 try:
     import serial
     import serial.tools.list_ports
-    import smbus2
-    HARDWARE_LIBS_AVAILABLE = True
+    PYSERIAL_AVAILABLE = True
 except ImportError:
-    HARDWARE_LIBS_AVAILABLE = False
-    print("⚠️ UYARI: 'pyserial' veya 'smbus2' kütüphaneleri bulunamadı. Sadece sanal sensörler çalışacaktır.")
+    PYSERIAL_AVAILABLE = False
 
+try:
+    from smbus2 import SMBus, i2c_msg
+    SMBUS_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    SMBUS_AVAILABLE = False
 
+# --- Ana Agent Sınıfı ---
 class OrionAgent:
+    # ... (OrionAgent sınıfının tüm içeriği bir önceki cevaptakiyle BİREBİR AYNI) ...
     def __init__(self, config_file='config.ini'):
-        # ... (__init__ metodu, veritabanı ve temel ayarlar için aynı kalıyor) ...
-        self.config = self._load_ini_config(config_file)
-        if not self.config: self.is_configured = False; return
-        self.base_url = self.config['server']['base_url']
-        self.token = self.config['device']['token']
+        print("--- Orion Agent Başlatılıyor ---")
+        self.is_configured = False
+        
+        local_config = self._load_ini_config(config_file)
+        if not local_config: return
+
+        self.base_url = local_config['server']['base_url']
+        self.token = local_config['device']['token']
         self.headers = {'Authorization': f'Token {self.token}', 'Content-Type': 'application/json'}
-        self.device_config = None; self.is_configured = True
-        self.scheduler = BlockingScheduler(timezone="Europe/Istanbul")
+        
         self.db_path = os.path.join(os.path.dirname(__file__), 'offline_queue.db')
-        self._init_local_db()
-        # Okuma döngüsü içinde toplanan verileri sanal sensörler için saklayacak önbellek
-        self.reading_cache = {}
-        print("✅ Agent başlatıldı ve yerel konfigürasyon yüklendi.")
-
-    # --- Okuma, Ayrıştırma ve Hesaplama Motorları (YENİ ve GÜNCELLENMİŞ) ---
-    def _read_physical_sensor(self, sensor_config):
-        """Arayüz tipine göre ilgili donanım okuma fonksiyonunu çağırır."""
-        if not HARDWARE_LIBS_AVAILABLE:
-            print(f"   -> Donanım kütüphaneleri eksik, '{sensor_config['name']}' sensörü okunamıyor.")
-            return None
-
-        interface = sensor_config.get('interface')
-        if interface == 'serial':
-            return self._read_serial_sensor(sensor_config)
-        elif interface == 'i2c':
-            return self._read_i2c_sensor(sensor_config)
-        else:
-            print(f"   -> Desteklenmeyen arayüz: '{interface}'")
-            return None
-
-    def _read_serial_sensor(self, sensor_config):
-        """VID ve PID kullanarak doğru seri portu bulur ve veri okur."""
-        conf = sensor_config.get('config', {})
-        vid = conf.get('vid')
-        pid = conf.get('pid')
-        baudrate = conf.get('baudrate', 9600)
-
-        if not vid or not pid:
-            print("   -> HATA: Seri sensör için 'vid' ve 'pid' yapılandırması eksik.")
-            return None
-        
-        port_to_use = None
-        ports = serial.tools.list_ports.comports()
-        for port in ports:
-            if port.vid == vid and port.pid == pid:
-                port_to_use = port.device
-                break
-        
-        if not port_to_use:
-            print(f"   -> HATA: VID={vid}, PID={pid} ile eşleşen bir seri port bulunamadı.")
-            return None
+        if not self._init_local_db(): return
             
+        self.device_config = None
+        self.scheduler = BlockingScheduler(timezone="Europe/Istanbul")
+        self.reading_cache = {}
+        
+        self.is_configured = True
+        print("✅ Agent başlatılmaya hazır.")
+
+    def _load_ini_config(self, config_file):
+        print(f"Yerel konfigürasyon okunuyor: {config_file}")
         try:
-            with serial.Serial(port_to_use, baudrate, timeout=2) as ser:
-                print(f"   -> Seri port '{port_to_use}' açıldı. Veri bekleniyor...")
-                time.sleep(2) # Sensörün veri göndermeye başlaması için bekle
-                raw_data = ser.read(100).decode('utf-8', errors='ignore').strip()
-                print(f"   -> Ham Veri Alındı: '{raw_data}'")
-                return raw_data
-        except serial.SerialException as e:
-            print(f"   -> HATA: Seri port '{port_to_use}' okunurken hata: {e}")
+            parser = configparser.ConfigParser()
+            if not parser.read(config_file, encoding='utf-8'):
+                raise FileNotFoundError(f"{config_file} bulunamadı veya boş.")
+            return {s: dict(parser.items(s)) for s in parser.sections()}
+        except Exception as e:
+            print(f"❌ HATA: Yerel konfigürasyon okunamadı! {e}")
             return None
 
-    def _read_i2c_sensor(self, sensor_config):
-        """Belirtilen I2C adresinden veri okur."""
-        conf = sensor_config.get('config', {})
-        address_str = conf.get('address')
-        if not address_str:
-            print("   -> HATA: I2C sensör için 'address' yapılandırması eksik.")
-            return None
-        
+    def _init_local_db(self):
+        print("Yerel çevrimdışı kuyruk veritabanı kontrol ediliyor...")
         try:
-            address = int(address_str, 16) # "0x44" gibi bir string'i sayıya çevir
-            # SHT3x için 6 byte oku
-            with smbus2.SMBus(1) as bus:
-                # Ölçüm komutu gönder
-                bus.write_i2c_block_data(address, 0x2C, [0x06])
-                time.sleep(0.5) # Ölçüm için bekle
-                # 6 byte'lık veriyi oku
-                raw_data = bus.read_i2c_block_data(address, 0x00, 6)
-                print(f"   -> Ham Veri Alındı (I2C): {list(raw_data)}")
-                return bytes(raw_data)
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS readings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    payload TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+            conn.close()
+            print("✅ Veritabanı hazır.")
+            return True
         except Exception as e:
-            print(f"   -> HATA: I2C adresi '{address_str}' okunurken hata: {e}")
+            print(f"❌ HATA: Yerel veritabanı oluşturulamadı: {e}")
+            return False
+
+    def get_server_configuration(self):
+        print("\n📡 Sunucudan cihaz yapılandırması isteniyor...")
+        config_url = f"{self.base_url}/api/v3/device/config/"
+        try:
+            response = requests.get(config_url, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                self.device_config = response.json()
+                print("✅ Yapılandırma başarıyla alındı.")
+                return True
+            else:
+                print(f"❌ HATA: Yapılandırma alınamadı. Sunucu: {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            print(f"❌ HATA: Sunucuya bağlanılamadı! {e}")
+            return False
+
+    def master_read_cycle(self):
+        ts = time.strftime('%Y-%m-%d %H:%M:%S')
+        print(f"\n🔄 ({ts}) Ana okuma döngüsü başladı.")
+        self._process_offline_queue()
+        print("--- Fiziksel Sensörler Okunuyor ---")
+        self.reading_cache.clear()
+        self._read_all_physical_sensors()
+        print("--- Okuma Tamamlandı ---")
+        if not self.reading_cache:
+            print("-> Gönderilecek yeni veri bulunamadı.")
+            return
+        print("\n--- Yeni Veriler Sunucuya Gönderiliyor ---")
+        for sensor_id, value in self.reading_cache.items():
+            payload = {"sensor": sensor_id, "value": value}
+            print(f"   -> {json.dumps(payload)}")
+            success, message = self._send_data_to_server(payload)
+            if success:
+                print(f"   -> ✅ Başarılı.")
+            else:
+                print(f"   -> ❌ Başarısız: {message}. Veri kuyruğa alınıyor.")
+                self._queue_data_locally(payload)
+        print("--- Gönderim Tamamlandı ---")
+
+    def _read_all_physical_sensors(self):
+        sensors_to_read = [
+            s for s in self.device_config.get('sensors', []) 
+            if s.get('interface') != 'virtual' and s.get('is_active')
+        ]
+        for sensor_config in sensors_to_read:
+            interface = sensor_config.get('interface')
+            print(f"  -> Okunuyor: {sensor_config['name']} ({interface})")
+            raw_data = None
+            if interface == 'serial':
+                raw_data = self._read_serial(sensor_config.get('config', {}))
+            elif interface == 'i2c':
+                raw_data = self._read_i2c(sensor_config.get('config', {}))
+            else:
+                print(f"     -> UYARI: Desteklenmeyen arayüz: {interface}")
+                continue
+            if raw_data is None:
+                print("     -> Ham veri okunamadı.")
+                continue
+            parsed_data = self._parse_data(raw_data, sensor_config)
+            if parsed_data is None:
+                print("     -> Veri ayrıştırılamadı.")
+                continue
+            print(f"     -> İşlenmiş Veri: {parsed_data}")
+            self.reading_cache[sensor_config['id']] = parsed_data
+
+    def _read_serial(self, config):
+        if not PYSERIAL_AVAILABLE: return None
+        port = config.get('port')
+        if not port: return None
+        try:
+            with serial.Serial(port, config.get('baudrate', 9600), timeout=2) as ser:
+                time.sleep(1.8)
+                return ser.read(100)
+        except serial.SerialException as e:
+            print(f"     -> HATA: Seri port açılamadı ({port}): {e}")
+            return None
+
+    def _read_i2c(self, config):
+        if not SMBUS_AVAILABLE: return None
+        address = config.get('address')
+        if not address: return None
+        try:
+            i2c_addr = int(str(address), 16)
+            with SMBus(config.get('bus', 1)) as bus:
+                write = i2c_msg.write(i2c_addr, [0x2C, 0x06])
+                read = i2c_msg.read(i2c_addr, 6)
+                bus.i2c_rdwr(write)
+                time.sleep(0.5)
+                bus.i2c_rdwr(read)
+                data = list(read)
+                temp = -45 + (175 * (data[0] * 256 + data[1])) / 65535.0
+                humidity = 100 * (data[3] * 256 + data[4]) / 65535.0
+                return {'temperature': round(temp, 2), 'humidity': round(humidity, 2)}
+        except (OSError, ValueError) as e:
+            print(f"     -> HATA: I2C sensöründen okunamadı ({address}): {e}")
             return None
 
     def _parse_data(self, raw_data, sensor_config):
-        """Ayrıştırıcı tipine göre ham veriyi işler."""
         parser_type = sensor_config.get('parser_type')
         parser_config = sensor_config.get('parser_config', {})
-        
         if parser_type == 'regex':
-            return self._parse_with_regex(raw_data, parser_config)
-        elif parser_type == 'binary':
-            return self._parse_with_binary(raw_data, parser_config)
-        elif parser_type == 'simple':
-            return {'value': raw_data} # Basitçe ham veriyi paketle
-        else:
-            print(f"   -> Desteklenmeyen ayrıştırıcı: '{parser_type}'")
+            rule = parser_config.get('rule')
+            if not rule: return None
+            text_data = raw_data.decode('utf-8', errors='ignore')
+            match = re.search(rule, text_data)
+            if match:
+                return {'value': float(match.group(1))}
             return None
-
-    def _parse_with_regex(self, raw_data, p_conf):
-        rule = p_conf.get('rule')
-        mapping = p_conf.get('output_mapping')
-        if not rule or not mapping or not isinstance(raw_data, str): return None
-        
-        # En son satırı alarak kısmi veri okuma sorununu çözmeye çalışalım
-        last_line = raw_data.strip().split('\n')[-1]
-        match = re.search(rule, last_line)
-        if not match: return None
-        
-        result = {}
-        for group_key, output_key in mapping.items():
-            try:
-                group_index = int(group_key.split('_')[1])
-                value = match.group(group_index)
-                result[output_key] = float(value)
-            except (ValueError, IndexError, TypeError):
-                continue
-        return result if result else None
-    
-    def _parse_with_binary(self, raw_data, p_conf):
-        format_rule = p_conf.get('format')
-        mapping = p_conf.get('output_mapping', {})
-        if not format_rule or not isinstance(raw_data, bytes): return None
-
-        if format_rule == 'SHT3X_6BYTE':
-            if len(raw_data) != 6: return None
-            result = {}
-            for key, rules in mapping.items():
-                formula = rules.get('formula')
-                if formula:
-                    try:
-                        # Eval'i güvenli bir context'te çalıştır
-                        value = eval(formula, {"__builtins__": None}, {"bytes": raw_data})
-                        result[key] = round(value, 2)
-                    except Exception as e:
-                        print(f"   -> HATA: Binary formülü ('{key}') hesaplanırken hata: {e}")
-            return result
+        elif parser_type == 'binary_dfrobot_lidar':
+            if not isinstance(raw_data, bytes) or len(raw_data) < 4: return None
+            start_index = raw_data.find(b'\xFF')
+            if start_index == -1 or start_index + 4 > len(raw_data): return None
+            packet = raw_data[start_index : start_index + 4]
+            checksum = (packet[0] + packet[1] + packet[2]) & 0xFF
+            if checksum != packet[3]:
+                print("     -> Checksum hatası!")
+                return None
+            distance_mm = (packet[1] << 8) + packet[2]
+            return {'distance_cm': round(distance_mm / 10.0, 1)}
+        elif parser_type == 'simple':
+            return raw_data
+        print(f"     -> UYARI: Bilinmeyen ayrıştırıcı tipi: {parser_type}")
         return None
 
-    def _calculate_virtual_sensor(self, sensor_config):
-        """Sanal sensörün değerini önbellekteki verilerden hesaplar."""
-        conf = sensor_config.get('config', {})
-        formula = conf.get('formula')
-        input_keys = conf.get('input_keys', [])
-        output_key = conf.get('output_key', 'value')
-
-        if not formula or not input_keys: return None
-
-        # Gerekli girdiler önbellekte var mı?
-        if not all(key in self.reading_cache for key in input_keys):
-            print(f"   -> Sanal sensör için gerekli girdiler ({input_keys}) önbellekte bulunamadı.")
-            return None
-        
+    def _send_data_to_server(self, payload):
         try:
-            # Sadece gerekli girdileri formül context'ine koy
-            context = {key: self.reading_cache[key] for key in input_keys}
-            result = eval(formula, {"__builtins__": None}, context)
-            return {output_key: round(result, 2)}
+            response = requests.post(f"{self.base_url}/api/v3/readings/submit/", headers=self.headers, json=payload, timeout=10)
+            return (True, "OK") if response.status_code == 201 else (False, f"Sunucu Hatası {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            return False, "Bağlantı Hatası"
+
+    def _queue_data_locally(self, payload):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.cursor().execute("INSERT INTO readings (payload) VALUES (?)", (json.dumps(payload),))
+            conn.commit()
+            conn.close()
         except Exception as e:
-            print(f"   -> HATA: Sanal sensör formülü hesaplanırken hata: {e}")
-            return None
-            
-    # --- Ana Döngü ve Sunucu İletişimi (GÜNCELLENMİŞ) ---
-    def master_read_cycle(self):
-        """Ana okuma döngüsü: Önce kuyruğu işle, sonra SENSÖRLERİ OKU."""
-        ts = time.strftime('%Y-%m-%d %H:%M:%S')
-        print(f"\n🔄 ({ts}) Ana okuma döngüsü çalıştı.")
-        
-        self.reading_cache.clear() # Her döngü başında önbelleği temizle
-        self._process_offline_queue()
+            print(f"   -> ❌ HATA: Veri yerel kuyruğa eklenemedi: {e}")
 
-        if not self.device_config or not self.device_config.get('sensors'):
-            print("   -> Sunucudan sensör yapılandırması alınamadı, döngü atlanıyor.")
-            return
-
-        all_sensors = self.device_config['sensors']
-        physical_sensors = [s for s in all_sensors if s.get('interface') != 'virtual' and s.get('is_active')]
-        virtual_sensors = [s for s in all_sensors if s.get('interface') == 'virtual' and s.get('is_active')]
-
-        # 1. Önce fiziksel sensörleri oku ve sonuçları önbelleğe al
-        print("\n--- Fiziksel Sensörler Okunuyor ---")
-        for sensor in physical_sensors:
-            print(f"-> İşleniyor: {sensor['name']}")
-            raw_data = self._read_physical_sensor(sensor)
-            if raw_data is not None:
-                processed_data = self._parse_data(raw_data, sensor)
-                if processed_data:
-                    self.reading_cache.update(processed_data)
-                    self._submit_data(sensor['id'], processed_data)
-
-        # 2. Sonra sanal sensörleri hesapla
-        print("\n--- Sanal Sensörler Hesaplanıyor ---")
-        for sensor in virtual_sensors:
-            print(f"-> İşleniyor: {sensor['name']}")
-            calculated_data = self._calculate_virtual_sensor(sensor)
-            if calculated_data:
-                self.reading_cache.update(calculated_data) # Gelecekte başka bir sanal sensör bunu kullanabilir
-                self._submit_data(sensor['id'], calculated_data)
-
-    def _submit_data(self, sensor_id, value_dict):
-        """Veriyi ya sunucuya gönderir ya da yerel kuyruğa atar."""
-        payload = {"sensor": sensor_id, "value": value_dict}
-        print(f"   -> Sonuç: {json.dumps(payload)}")
-        success, message = self._send_data_to_server(payload)
-        if success:
-            print(f"   -> ✅ {message}")
-        else:
-            print(f"   -> ❌ Sunucuya gönderilemedi. Sebep: {message.split('(')[0]}")
-            self._queue_data_locally(payload)
-    
-    # ... (_init_local_db, _load_ini_config, get_server_configuration,
-    # _send_data_to_server, _queue_data_locally, _process_offline_queue, run,
-    # check_and_install_dependencies fonksiyonları büyük ölçüde aynı kalıyor.
-    # Sadece run'dan 'sensor_to_use' kısmını çıkarabiliriz.)
-    
-    def run(self):
-        if not self.is_configured: sys.exit(1)
-        print("\n" + "="*50 + "\n🚀 Orion Agent v3.0 - Faz 4.1 Başlatılıyor...\n" + "="*50)
-
-        if not self.get_server_configuration():
-            print("\n🛑 Agent, başlangıçta sunucudan yapılandırma alamadığı için durduruluyor.")
-            # Gelecekte burada lokal konfigürasyondan çalışma özelliği eklenebilir.
-            sys.exit(1)
-
-        # En kısa okuma aralığını bularak ana döngü sıklığını belirle
-        intervals = [s.get('read_interval', 60) for s in self.device_config.get('sensors', []) if s.get('is_active')]
-        run_interval = min(intervals) if intervals else 60
-        
-        self.scheduler.add_job(self.master_read_cycle, 'interval', seconds=run_interval, id='master_cycle')
-        print(f"\n⏰ Zamanlayıcı kuruldu. Ana okuma döngüsü her {run_interval} saniyede bir çalışacak.")
-        print("💡 Çıkmak için Ctrl+C'ye basın.")
-        
+    def _process_offline_queue(self):
         try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            queued_items = cursor.execute("SELECT id, payload FROM readings ORDER BY id ASC").fetchall()
+            if queued_items:
+                print(f"\n📬 Çevrimdışı kuyrukta {len(queued_items)} kayıt var, gönderiliyor...")
+                for item in queued_items:
+                    success, msg = self._send_data_to_server(json.loads(item['payload']))
+                    if success:
+                        print(f"   -> Kuyruk (ID: {item['id']}) gönderildi.")
+                        cursor.execute("DELETE FROM readings WHERE id = ?", (item['id'],))
+                        conn.commit()
+                    else:
+                        print("   -> Sunucuya ulaşılamıyor, kuyruk işlemi durduruldu.")
+                        break
+            conn.close()
+        except Exception as e:
+            print(f"   -> ❌ HATA: Kuyruk işlenemedi: {e}")
+
+    def run(self):
+        if not self.is_configured:
+            print("❌ Agent, yerel konfigürasyon hatası nedeniyle başlatılamıyor.")
+            sys.exit(1)
+        if not self.get_server_configuration():
+            print("❌ Agent, sunucuya bağlanamadığı için başlatılamıyor.")
+            sys.exit(1)
+        run_interval = 10
+        print(f"\n⏰ Zamanlayıcı kuruldu. Ana döngü her {run_interval} saniyede bir çalışacak.")
+        print("💡 Çıkmak için Ctrl+C'ye basın.")
+        try:
+            self.master_read_cycle()
+            self.scheduler.add_job(self.master_read_cycle, 'interval', seconds=run_interval)
             self.scheduler.start()
         except (KeyboardInterrupt, SystemExit):
             print("\n🛑 Agent durduruluyor...")
+            self.scheduler.shutdown()
+
+# --- Script Başlangıç Kısmı ---
+
+def check_and_install_dependencies():
+    """ Gerekli temel kütüphanelerin yüklü olup olmadığını kontrol eder. """
+    dependencies = ['requests', 'apscheduler']
+    missing = []
+    for package in dependencies:
+        try:
+            __import__(package)
+        except ImportError:
+            missing.append(package)
     
-    # Geri kalan tüm yardımcı fonksiyonlar (veritabanı, sunucu iletişimi vb.)
-    # bir önceki adımdaki ile aynı. Kodu kısaltmak için buraya eklemiyorum,
-    # ama yukarıdaki tam kodda hepsi mevcut.
+    if missing:
+        print(f"\nEksik kütüphaneler bulundu: {', '.join(missing)}. Yükleniyor...")
+        try:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', *missing])
+            print("✅ Gerekli kütüphaneler başarıyla yüklendi.")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ HATA: Kütüphaneler yüklenemedi. Lütfen manuel yükleyin: 'pip install {' '.join(missing)}'. Hata: {e}")
+            sys.exit(1)
+
+if __name__ == "__main__":
+    check_and_install_dependencies()
+    agent = OrionAgent()
+    agent.run()
