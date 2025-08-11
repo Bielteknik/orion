@@ -241,22 +241,35 @@ class OrionAgent:
             print("\n🛑 Agent durduruluyor..."); self.scheduler.shutdown()
 
 def check_and_install_dependencies():
-    dependencies = ['requests', 'apscheduler']
-    if sys.platform.startswith('linux'): # Sadece Pi gibi Linux sistemlerinde kontrol et
-        dependencies.extend(['pyserial', 'smbus2'])
+    """ Gerekli kütüphanelerin yüklü olup olmadığını kontrol eder, eksikse yükler. """
+    base_dependencies = ['requests', 'apscheduler']
+    # Donanım kütüphanelerini sadece Raspberry Pi gibi Linux sistemlerinde zorunlu kıl
+    if sys.platform.startswith('linux'):
+        base_dependencies.extend(['pyserial', 'smbus2'])
     
-    try:
-        for package in dependencies: __import__(package)
-    except ImportError:
-        print(f"\nEksik kütüphaneler kuruluyor...")
+    missing_packages = []
+    for package_name in base_dependencies:
         try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', *dependencies])
+            __import__(package_name)
+        except ImportError:
+            missing_packages.append(package_name)
+
+    # Sadece eksik paket varsa yükleme işlemi yap
+    if missing_packages:
+        print(f"\nEksik kütüphaneler bulundu: {', '.join(missing_packages)}. Yükleniyor...")
+        try:
+            # Sadece eksik olanları yükle
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', *missing_packages])
             print("✅ Gerekli kütüphaneler başarıyla kuruldu.")
-            # Kütüphaneler yeni kurulduğu için script'i yeniden başlatmak en sağlıklısı
-            print("Lütfen script'i yeniden çalıştırın.")
-            sys.exit()
-        except Exception as e:
-            sys.exit(f"❌ HATA: Kütüphaneler yüklenemedi. Manuel yükleyin: 'pip install {' '.join(dependencies)}'. Hata: {e}")
+            # Kütüphaneler YENİ kurulduğu için, script'in yeniden başlatılması en sağlıklısı
+            print("Lütfen script'i tekrar çalıştırın.")
+            sys.exit(0) # Başarılı bir şekilde çıkış yap
+        except subprocess.CalledProcessError as e:
+            print(f"❌ HATA: Kütüphaneler yüklenemedi. Lütfen manuel yükleyin: 'pip install {' '.join(missing_packages)}'. Hata: {e}")
+            sys.exit(1) # Hata ile çıkış yap
+    
+    # Eğer bu noktaya geldiyse, tüm kütüphaneler zaten yüklü demektir.
+    # Hiçbir mesaj göstermeden devam et.
 
 if __name__ == "__main__":
     check_and_install_dependencies()
