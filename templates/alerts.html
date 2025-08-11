@@ -22,7 +22,7 @@
                             me-2" style="color: {% if alert.severity == 'critical' %}var(--danger-color){% else %}var(--warning-color){% endif %};"></i>
                             {{ alert.rule.name|default:"Bilinmeyen Kural" }}
                         </h6>
-                        <p class="mb-0" style="color: var(--text-light);">{{ alert.message }}</p>
+                        <p class="mb-0" style="color: var(--text-light);">{{ alert.message|truncatewords:15 }}</p>
                         <small style="color: var(--text-light);">{{ alert.timestamp|timesince }} önce</small>
                     </div>
                 </div>

@@ -155,11 +155,11 @@ class AlertsView(LoginRequiredMixin, View):
         # Tüm çözülmemiş (acknowledged=False) uyarıları al
         active_alerts = Alert.objects.filter(is_acknowledged=False).select_related('rule', 'device')
         # Tüm uyarıları (geçmiş) al
-        all_alerts = Alert.objects.all().select_related('rule', 'device')[:50] # Son 50 taneyi göster
+        alert_history = Alert.objects.all().select_related('rule', 'device')[:50] # Son 50 taneyi göster
         
         context = {
             'active_alerts': active_alerts,
-            'alert_history': all_alerts,
+            'alert_history': alert_history,
         }
         return render(request, 'alerts.html', context)
 
