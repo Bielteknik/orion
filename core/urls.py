@@ -1,5 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from . import camera_stream
 from .views import (
     CameraCaptureViewSet,
     CameraViewSet,
@@ -40,6 +41,7 @@ urlpatterns = [
     path('alerts/', AlertsView.as_view(), name='alerts'),
     path('settings/', SettingsView.as_view(), name='settings'),
     path('analytics/data/', AnalyticsDataView.as_view(), name='analytics-data'),
+    path('cameras/<int:pk>/feed/', camera_stream.camera_feed, name='camera-feed'),
 
     # Özel API URL'leri (router'a uymayanlar)
     path('api/v3/device/config/', DeviceConfigView.as_view(), name='api-device-config'),
