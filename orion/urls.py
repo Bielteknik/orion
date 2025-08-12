@@ -1,16 +1,15 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
-
-# YENİ: Gerekli importları ekliyoruz
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', RedirectView.as_view(url='/dashboard/')),
+    
+    # Tüm frontend ve API isteklerini tek bir include ile core uygulamasına yönlendir.
     path('', include('core.urls')),
-    path('api/v3/', include('core.urls.api_patterns')),
 ]
 
 if settings.DEBUG:
