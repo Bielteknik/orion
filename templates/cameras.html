@@ -6,9 +6,44 @@
 <div id="cameras" class="page-content active">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="page-title"><i class="fas fa-video me-2"></i>Kameralar</h2>
-        <button class="btn btn-gradient" data-bs-toggle="modal" data-bs-target="#cameraModal">
-            <i class="fas fa-plus me-2"></i>Yeni Kamera
-        </button>
+        <div>
+            <button class="btn btn-outline-light me-2" disabled><i class="fas fa-camera me-2"></i>Tümünden Fotoğraf Çek</button>
+            <button class="btn btn-gradient" data-bs-toggle="modal" data-bs-target="#cameraModal">
+                <i class="fas fa-plus me-2"></i>Yeni Kamera
+            </button>
+        </div>
+    </div>
+
+    <!-- İstatistik Kartları -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-video fa-2x text-success mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.active_cameras }}</h4>
+                <p style="color: var(--text-light);" class="mb-0">Aktif Kamera</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-record-vinyl fa-2x text-danger mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.recording_cameras }}</h4>
+                <p style="color: var(--text-light);" class="mb-0">Kayıt Yapıyor</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-camera fa-2x text-info mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.captures_today }}</h4>
+                <p style="color: var(--text-light);" class="mb-0">Bugün Çekilen</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card text-center">
+                <i class="fas fa-hdd fa-2x text-warning mb-2"></i>
+                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.storage_used_tb }} TB</h4>
+                <p style="color: var(--text-light);" class="mb-0">Kullanılan Alan</p>
+            </div>
+        </div>
     </div>
 
     <div class="row">
@@ -21,22 +56,39 @@
                     </h5>
                     <div>
                         {% if camera.is_active %}
-                        <span class="badge bg-success me-2">Canlı</span>
+                            <span class="badge bg-success me-2">Canlı</span>
                         {% else %}
-                        <span class="badge bg-secondary me-2">Offline</span>
+                            <span class="badge bg-secondary me-2">Offline</span>
                         {% endif %}
+                        <span class="badge bg-info">HD</span> <!-- Bu şimdilik statik -->
                     </div>
                 </div>
                 <div class="bg-dark rounded mb-3 position-relative" style="height: 200px; display: flex; align-items-center; justify-content: center;">
                     <div class="text-center text-white">
                         <i class="fas fa-video-slash fa-3x mb-2"></i>
-                        <p>Canlı yayın entegrasyonu yakında.</p>
+                        <p>Canlı Yayın Entegrasyonu Yakında</p>
+                        <small>{{ camera.rtsp_url|truncatechars:30 }}</small>
                     </div>
+                    {% if camera.is_recording %}
+                    <div class="position-absolute top-0 start-0 m-2">
+                        <span class="badge bg-danger">
+                            <i class="fas fa-circle me-1" style="animation: blink 1s infinite;"></i>REC
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="d-flex justify-content-end mb-2">
-                    <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ camera.id }}">
-                        <i class="fas fa-cog me-1"></i>Ayarlar
-                    </button>
+                <div class="d-flex justify-content-between mb-2">
+                    <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-expand me-1"></i>Tam Ekran</button>
+                    <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-camera me-1"></i>Fotoğraf Çek</button>
+                    <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-play me-1"></i>Kayıt</button>
+                    <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ camera.id }}"><i class="fas fa-cog me-1"></i>Ayarlar</button>
+                </div>
+                <!-- Alt bilgi çubuğu (şimdilik statik) -->
+                <div class="row text-center" style="font-size: 12px; color: var(--text-light);">
+                    <div class="col-3"><i class="fas fa-thermometer-half me-1"></i>-</div>
+                    <div class="col-3"><i class="fas fa-eye me-1"></i>-</div>
+                    <div class="col-3"><i class="fas fa-wind me-1"></i>-</div>
+                    <div class="col-3"><i class="fas fa-snowflake me-1"></i>-</div>
                 </div>
             </div>
         </div>
@@ -75,10 +127,10 @@
 {% endblock content %}
 
 {% block extra_js %}
+<!-- Bir önceki adımdaki JavaScript kodunun tamamı buraya gelecek -->
 <script>
 $(document).ready(function() {
     const cameraModal = new bootstrap.Modal(document.getElementById('cameraModal'));
-    const csrftoken = $('[name=csrfmiddlewaretoken]').val();
 
     $('[data-bs-target="#cameraModal"]').on('click', function() {
         $('#cameraForm')[0].reset();
@@ -97,9 +149,7 @@ $(document).ready(function() {
             is_active: $('#cameraIsActive').is(':checked'),
         };
         $.ajax({
-            url: url, 
-            method: method, 
-            contentType: 'application/json',
+            url: url, method: method, contentType: 'application/json',
             data: JSON.stringify(data),
             success: function() { cameraModal.hide(); location.reload(); },
             error: function() { alert('Hata oluştu!'); }

@@ -148,9 +148,21 @@ class RuleViewSet(viewsets.ModelViewSet):
 class CamerasView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
     def get(self, request):
+        all_cameras = Camera.objects.select_related('device').all()
+        
+        # İstatistikleri hesapla
+        stats = {
+            'active_cameras': all_cameras.filter(is_active=True).count(),
+            'recording_cameras': all_cameras.filter(is_recording=True).count(),
+            # Diğer istatistikler şimdilik statik kalacak
+            'captures_today': 24, 
+            'storage_used_tb': 2.4 
+        }
+
         context = {
-            'all_cameras': Camera.objects.select_related('device').all(),
+            'all_cameras': all_cameras,
             'all_devices': Device.objects.all(),
+            'stats': stats, # İstatistikleri context'e ekle
         }
         return render(request, 'cameras.html', context)
 
