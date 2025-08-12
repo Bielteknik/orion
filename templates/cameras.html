@@ -14,119 +14,110 @@
             </button>
         </div>
     </div>
-
-    <!-- İstatistik Kartları -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="glass-card text-center">
-                <i class="fas fa-video fa-2x text-success mb-2"></i>
-                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.active_cameras }}</h4>
-                <p style="color: var(--text-light);" class="mb-0">Aktif Kamera</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="glass-card text-center">
-                <i class="fas fa-record-vinyl fa-2x text-danger mb-2"></i>
-                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.recording_cameras }}</h4>
-                <p style="color: var(--text-light);" class="mb-0">Kayıt Yapıyor</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="glass-card text-center">
-                <i class="fas fa-camera fa-2x text-info mb-2"></i>
-                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.captures_today }}</h4>
-                <p style="color: var(--text-light);" class="mb-0">Bugün Çekilen</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="glass-card text-center">
-                <i class="fas fa-hdd fa-2x text-warning mb-2"></i>
-                <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.storage_used_tb }} TB</h4>
-                <p style="color: var(--text-light);" class="mb-0">Kullanılan Alan</p>
-            </div>
-        </div>
-    </div>
-
     <div class="row">
-        {% for camera in all_cameras %}
-        <div class="col-md-6 mb-4">
-            <div class="glass-card">
+        <!-- Sol Taraf: Ana Kamera Alanı (Genişletilmiş) -->
+        <div class="col-lg-8">
+            {% if all_cameras.first as first_camera %}
+            <div class="glass-card mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 style="color: var(--dark-color); font-weight: 600;"><i class="fas fa-video me-2"></i>{{ camera.device.name }} - {{ camera.name }}</h5>
+                    <h5 style="color: var(--dark-color); font-weight: 600;">
+                        <i class="fas fa-video me-2"></i>{{ first_camera.device.name }} - {{ first_camera.name }}
+                    </h5>
                     <div>
-                        <button class="btn btn-sm {% if camera.status == 'active' %}btn-success play-stream-btn{% else %}btn-secondary{% endif %}" 
-                                {% if camera.status != 'active' %}disabled{% endif %}
-                                data-feed-url="{% url 'camera-feed' camera.pk %}"
-                                data-target-id="camera-feed-{{ camera.id }}">
+                        <button class="btn btn-sm {% if first_camera.status == 'active' %}btn-success play-stream-btn{% else %}btn-secondary{% endif %}" 
+                                {% if first_camera.status != 'active' %}disabled{% endif %}
+                                data-feed-url="{% url 'camera-feed' first_camera.pk %}"
+                                data-target-id="camera-feed-{{ first_camera.id }}">
                             <i class="fas fa-play me-1"></i>Canlı
                         </button>
-                        <span class="badge bg-info">4K</span>
                     </div>
                 </div>
-                <div class="bg-dark rounded mb-3 position-relative camera-feed-container" style="height: 200px;">
-                    <div id="camera-feed-{{ camera.id }}" class="w-100 h-100">
+                <!-- Canlı Yayın Alanı -->
+                <div class="bg-dark rounded mb-3 position-relative camera-feed-container" style="height: 450px;">
+                     <div id="camera-feed-{{ first_camera.id }}" class="w-100 h-100">
                         <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center">
-                            {% if camera.status == 'active' %}
-                            <i class="fas fa-play-circle fa-3x mb-2"></i>
+                            {% if first_camera.status == 'active' %}
+                            <i class="fas fa-play-circle fa-4x mb-3"></i>
                             <p>Canlı Yayını Başlat</p>
                             {% else %}
-                            <i class="fas fa-exclamation-triangle fa-3x mb-2"></i>
-                            <p>Kamera {{ camera.get_status_display }}</p>
+                            <i class="fas fa-exclamation-triangle fa-4x mb-3"></i>
+                            <p>Kamera {{ first_camera.get_status_display }}</p>
                             {% endif %}
                         </div>
                     </div>
-                    {% if camera.is_recording %}
-                    <div class="position-absolute top-0 start-0 m-2 rec-indicator">
-                        <span class="badge bg-danger"><i class="fas fa-circle me-1" style="animation: blink 1s infinite;"></i>REC</span>
-                    </div>
-                    {% endif %}
-                    <div class="position-absolute bottom-0 end-0 m-2">
-                        <small class="text-white bg-dark bg-opacity-75 px-2 py-1 rounded camera-timestamp"></small>
-                    </div>
                 </div>
+                <!-- Kontrol Butonları -->
                 <div class="d-flex justify-content-between mb-2">
-                    <button class="btn btn-sm btn-outline-light fullscreen-btn" data-target-id="camera-feed-{{ camera.id }}"><i class="fas fa-expand me-1"></i>Tam Ekran</button>
-                    <button class="btn btn-sm btn-outline-primary capture-photo-btn" data-id="{{ camera.id }}"><i class="fas fa-camera me-1"></i>Fotoğraf Çek</button>
-                    <button class="btn btn-sm btn-outline-light toggle-record-btn" data-id="{{ camera.id }}">
-                        {% if camera.is_recording %}<i class="fas fa-stop me-1"></i>Durdur{% else %}<i class="fas fa-play me-1"></i>Kayıt{% endif %}
-                    </button>
-                    <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ camera.id }}"><i class="fas fa-cog me-1"></i>Ayarlar</button>
+                    <button class="btn btn-sm btn-outline-light fullscreen-btn" data-target-id="camera-feed-{{ first_camera.id }}"><i class="fas fa-expand me-1"></i>Tam Ekran</button>
+                    <button class="btn btn-sm btn-outline-primary capture-photo-btn" data-id="{{ first_camera.id }}"><i class="fas fa-camera me-1"></i>Fotoğraf Çek</button>
+                    <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ first_camera.id }}"><i class="fas fa-cog me-1"></i>Ayarlar</button>
                 </div>
-                {% with reading=all_camera_readings|get_item:camera.device_id %}
-                <div class="row text-center" style="font-size: 12px; color: var(--text-light);">
-                    <div class="col-3"><i class="fas fa-thermometer-half me-1"></i>{{ reading.value.temperature|floatformat:1|default:"-" }}°C</div>
-                    <div class="col-3"><i class="fas fa-eye me-1"></i>-</div>
-                    <div class="col-3"><i class="fas fa-wind me-1"></i>-</div>
-                    <div class="col-3"><i class="fas fa-snowflake me-1"></i>-</div>
-                </div>
-                {% endwith %}
             </div>
-        </div>        
-        {% empty %}
-        <div class="col-12"><div class="alert alert-info">Sistemde kayıtlı kamera bulunmuyor.</div></div>
-        {% endfor %}
+            {% else %}
+            <div class="glass-card mb-4 d-flex align-items-center justify-content-center" style="height: 500px;">
+                <p class="text-muted">Görüntülenecek kamera yok.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sağ Taraf: İstatistik Kartları (2x2 Grid) -->
+        <div class="col-lg-4">
+            <div class="row">
+                <div class="col-6 mb-4">
+                    <div class="glass-card text-center h-100">
+                        <i class="fas fa-video fa-2x text-success mb-2"></i>
+                        <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.active_cameras }}</h4>
+                        <p style="color: var(--text-light);" class="mb-0">Aktif Kamera</p>
+                    </div>
+                </div>
+                <div class="col-6 mb-4">
+                    <div class="glass-card text-center h-100">
+                        <i class="fas fa-record-vinyl fa-2x text-danger mb-2"></i>
+                        <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.recording_cameras }}</h4>
+                        <p style="color: var(--text-light);" class="mb-0">Kayıt Yapıyor</p>
+                    </div>
+                </div>
+                <div class="col-6 mb-4">
+                    <div class="glass-card text-center h-100">
+                        <i class="fas fa-camera fa-2x text-info mb-2"></i>
+                        <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.captures_today }}</h4>
+                        <p style="color: var(--text-light);" class="mb-0">Bugün Çekilen</p>
+                    </div>
+                </div>
+                <div class="col-6 mb-4">
+                    <div class="glass-card text-center h-100">
+                        <i class="fas fa-hdd fa-2x text-warning mb-2"></i>
+                        <h4 style="color: var(--dark-color); font-weight: 600;">{{ stats.storage_used_tb }} TB</h4>
+                        <p style="color: var(--text-light);" class="mb-0">Kullanılan Alan</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Buraya başka bir kamera listesi veya bilgi paneli de eklenebilir -->
+        </div>
     </div>
-    <!-- Son Çekilen Fotoğraflar -->
+    
+    <!-- Alt Kısım: Son Çekilen Fotoğraflar -->
     <div class="glass-card">
         <h5 style="color: var(--dark-color); font-weight: 600;" class="mb-3">Son Çekilen Fotoğraflar</h5>
         <div class="row" id="recentPhotos">
             {% for capture in recent_captures %}
-            <div class="col-md-2 mb-3">
-                <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal" data-image-url="{{ capture.image.url }}" data-camera-name="{{ capture.camera.name }}">                
-                <div class="card bg-dark text-white">
-                    <img src="{{ capture.image.url }}" class="card-img-top" style="height: 100px; object-fit: cover;">
-                    <div class="card-img-overlay d-flex flex-column justify-content-end p-2" style="background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);">
-                        <small class="card-title" style="font-size: 0.8em;">{{ capture.camera.name }}</small>
-                        <small class="text-muted" style="font-size: 0.7em;">{{ capture.timestamp|timesince }} önce</small>
+            <div class="col-6 col-md-4 col-lg-2 mb-3">
+                <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal" data-image-url="{{ capture.image.url }}" data-camera-name="{{ capture.camera.name }}">
+                    <div class="card bg-dark text-white">
+                        <img src="{{ capture.image.url }}" class="card-img-top" style="height: 100px; object-fit: cover;">
+                        <div class="card-img-overlay d-flex flex-column justify-content-end p-2" style="background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);">
+                            <small class="card-title" style="font-size: 0.8em;">{{ capture.camera.name }}</small>
+                            <small class="text-muted" style="font-size: 0.7em;">{{ capture.timestamp|timesince }} önce</small>
+                        </div>
                     </div>
-                </div>
+                </a>
             </div>
             {% empty %}
             <p class="text-muted">Henüz çekilmiş fotoğraf yok.</p>
             {% endfor %}
         </div>
-    </div>    
-</div>
+    </div>
+</div> <!-- page-content sonu -->   
 
 <!-- YENİ: Resim Görüntüleme Modal'ı -->
 <div class="modal fade" id="imageModal" tabindex="-1">
@@ -142,7 +133,6 @@
     </div>
   </div>
 </div>
-
 <!-- Yeni Kamera Ekleme/Düzenleme Modal'ı -->
 <div class="modal fade" id="cameraModal" tabindex="-1">
     <div class="modal-dialog">
