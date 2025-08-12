@@ -70,31 +70,67 @@ $(document).ready(function() {
         updateBtn.html('<span class="spinner-border spinner-border-sm"></span> Yükleniyor...').prop('disabled', true);
 
         $.ajax({
-            url: url, method: 'GET',
+            url: url,
+            method: 'GET',
             success: function(data) {
-                chartPlaceholder.hide(); chartCanvas.show();
+                // GÜNCELLENMİŞ ve DAHA AKILLI VERİ İŞLEME MANTIĞI
                 const datasets = [];
-                const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#34495e'];
+                const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#34495e', '#e67e22', '#1abc9c'];
                 let colorIndex = 0;
                 
+                let hasData = false;
                 for (const sensorId in data) {
                     const sensorData = data[sensorId];
-                    if (sensorData.readings.length > 0) {
-                        for (const key in sensorData.readings[0].value) {
+                    if (sensorData.readings && sensorData.readings.length > 0) {
+                        // Bir sensörün birden fazla değeri olabilir (örn: temp ve hum).
+                        // Bu değerleri bir "veri serisi" olarak gruplayalım.
+                        const series = {}; // { 'temperature': [], 'humidity': [], 'distance_cm': [] }
+
+                        sensorData.readings.forEach(reading => {
+                            for (const key in reading.value) {
+                                if (!series[key]) {
+                                    series[key] = [];
+                                }
+                                series[key].push({
+                                    x: new Date(reading.timestamp),
+                                    y: reading.value[key]
+                                });
+                            }
+                        });
+
+                        // Şimdi her bir veri serisi için bir dataset oluşturalım.
+                        for (const seriesName in series) {
+                            hasData = true;
                             datasets.push({
-                                label: `${sensorData.device} - ${sensorData.name} (${key})`,
-                                data: sensorData.readings.map(r => ({x: new Date(r.timestamp), y: r.value[key]})),
+                                label: `${sensorData.device} - ${sensorData.name} (${seriesName})`,
+                                data: series[seriesName],
                                 borderColor: colors[colorIndex % colors.length],
-                                tension: 0.1, fill: false,
+                                tension: 0.1,
+                                fill: false,
                             });
                             colorIndex++;
                         }
                     }
                 }
-                drawChart(datasets);
+
+                if (hasData) {
+                    chartPlaceholder.hide();
+                    chartCanvas.show();
+                    drawChart(datasets);
+                } else {
+                    chartPlaceholder.html('<p class="text-muted">Seçilen zaman aralığında veri bulunamadı.</p>').show();
+                    chartCanvas.hide();
+                    if (analyticsChart) analyticsChart.destroy();
+                }
             },
-            error: function(error) { console.error("Hata:", error); alert('Grafik verisi çekilirken hata!'); },
-            complete: function() { updateBtn.html('<i class="fas fa-sync-alt me-2"></i>Güncelle').prop('disabled', false); }
+            error: function(error) {
+                console.error("Hata:", error);
+                chartPlaceholder.html('<div class="alert alert-danger">Grafik verileri çekilirken bir hata oluştu.</div>').show();
+                chartCanvas.hide();
+            },
+            complete: function() {
+                updateBtn.html('<i class="fas fa-sync-alt me-2"></i>Güncelle').prop('disabled', false);
+            }
         });
     });
 
@@ -102,10 +138,27 @@ $(document).ready(function() {
         if (analyticsChart) analyticsChart.destroy();
         const ctx = document.getElementById('analyticsChart').getContext('2d');
         analyticsChart = new Chart(ctx, {
-            type: 'line', data: { datasets: datasets },
-            options: { responsive: true, scales: { x: { type: 'time', time: { tooltipFormat: 'dd.MM.yyyy HH:mm', displayFormats: { hour: 'HH:mm', day: 'dd MMM' } } }, y: { title: { display: true, text: 'Değer' } } } }
+            type: 'line',
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            tooltipFormat: 'dd.MM.yyyy HH:mm',
+                            displayFormats: { hour: 'HH:mm', day: 'dd MMM' }
+                        },
+                        title: { display: true, text: 'Zaman' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Değer' }
+                    }
+                }
+            }
         });
     }
 });
 </script>
-{% endblock %}
+{% endblock extra_js %}
