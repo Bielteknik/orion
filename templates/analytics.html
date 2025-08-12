@@ -121,7 +121,16 @@ $(document).ready(function() {
             options: {
                 responsive: true, maintainAspectRatio: false,
                 scales: {
-                    x: { type: 'time', time: { tooltipFormat: 'dd.MM.yyyy HH:mm', displayFormats: { hour: 'HH:mm', day: 'dd MMM' } }, title: { display: true, text: 'Zaman' } },
+                    x: {
+                        type: 'time',
+                        time: {
+                            // Django'dan gelen tarih formatının ISO 8601 olduğunu belirtelim
+                            parser: 'iso', 
+                            tooltipFormat: 'dd.MM.yyyy HH:mm',
+                            displayFormats: { hour: 'HH:mm', day: 'dd MMM' }
+                        },
+                        title: { display: true, text: 'Zaman' }
+                    },
                     y: { title: { display: true, text: 'Değer' } }
                 }
             }
