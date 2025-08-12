@@ -86,6 +86,10 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
 # --- E-POSTA AYARLARI (Şirket Maili için) ---
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'mail.ejder3200.com'      # KENDİ SMTP SUNUCU ADRESİNİZİ GİRİN
