@@ -8,7 +8,8 @@ from .models import (
     Rule, 
     Condition, 
     Action, 
-    NotificationRecipient
+    NotificationRecipient,
+    Camera
 )
 
 @admin.register(Device)
@@ -62,3 +63,8 @@ class AlertAdmin(admin.ModelAdmin):
     list_display = ('rule', 'device', 'severity', 'is_acknowledged', 'timestamp')
     list_filter = ('severity', 'is_acknowledged', 'device')
     readonly_fields = ('rule', 'timestamp', 'message', 'device')
+
+@admin.register(Camera)
+class CameraAdmin(admin.ModelAdmin):
+    list_display = ('name', 'device', 'is_active')
+    list_filter = ('device', 'is_active')
