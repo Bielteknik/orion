@@ -17,49 +17,51 @@
     <div class="row">
         <!-- Sol Taraf: Ana Kamera Alanı (Genişletilmiş) -->
         <div class="col-lg-8">
-            {% if all_cameras.first as first_camera %}
-            <div class="glass-card mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 style="color: var(--dark-color); font-weight: 600;">
-                        <i class="fas fa-video me-2"></i>{{ first_camera.device.name }} - {{ first_camera.name }}
-                    </h5>
-                    <div>
-                        <button class="btn btn-sm {% if first_camera.status == 'active' %}btn-success play-stream-btn{% else %}btn-secondary{% endif %}" 
-                                {% if first_camera.status != 'active' %}disabled{% endif %}
-                                data-feed-url="{% url 'camera-feed' first_camera.pk %}"
-                                data-target-id="camera-feed-{{ first_camera.id }}">
-                            <i class="fas fa-play me-1"></i>Canlı
-                        </button>
-                    </div>
-                </div>
-                <!-- Canlı Yayın Alanı -->
-                <div class="bg-dark rounded mb-3 position-relative camera-feed-container" style="height: 450px;">
-                     <div id="camera-feed-{{ first_camera.id }}" class="w-100 h-100">
-                        <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center">
-                            {% if first_camera.status == 'active' %}
-                            <i class="fas fa-play-circle fa-4x mb-3"></i>
-                            <p>Canlı Yayını Başlat</p>
-                            {% else %}
-                            <i class="fas fa-exclamation-triangle fa-4x mb-3"></i>
-                            <p>Kamera {{ first_camera.get_status_display }}</p>
-                            {% endif %}
+            <!-- DÜZELTME: 'if as' yerine 'with' etiketi kullanılır -->
+            {% with first_camera=all_cameras.first %}
+                {% if first_camera %}
+                <div class="glass-card mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 style="color: var(--dark-color); font-weight: 600;">
+                            <i class="fas fa-video me-2"></i>{{ first_camera.device.name }} - {{ first_camera.name }}
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm {% if first_camera.status == 'active' %}btn-success play-stream-btn{% else %}btn-secondary{% endif %}" 
+                                    {% if first_camera.status != 'active' %}disabled{% endif %}
+                                    data-feed-url="{% url 'camera-feed' first_camera.pk %}"
+                                    data-target-id="camera-feed-{{ first_camera.id }}">
+                                <i class="fas fa-play me-1"></i>Canlı
+                            </button>
                         </div>
                     </div>
+                    <!-- Canlı Yayın Alanı -->
+                    <div class="bg-dark rounded mb-3 position-relative camera-feed-container" style="height: 450px;">
+                         <div id="camera-feed-{{ first_camera.id }}" class="w-100 h-100">
+                            <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center">
+                                {% if first_camera.status == 'active' %}
+                                <i class="fas fa-play-circle fa-4x mb-3"></i>
+                                <p>Canlı Yayını Başlat</p>
+                                {% else %}
+                                <i class="fas fa-exclamation-triangle fa-4x mb-3"></i>
+                                <p>Kamera {{ first_camera.get_status_display }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Kontrol Butonları -->
+                    <div class="d-flex justify-content-between mb-2">
+                        <button class="btn btn-sm btn-outline-light fullscreen-btn" data-target-id="camera-feed-{{ first_camera.id }}"><i class="fas fa-expand me-1"></i>Tam Ekran</button>
+                        <button class="btn btn-sm btn-outline-primary capture-photo-btn" data-id="{{ first_camera.id }}"><i class="fas fa-camera me-1"></i>Fotoğraf Çek</button>
+                        <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ first_camera.id }}"><i class="fas fa-cog me-1"></i>Ayarlar</button>
+                    </div>
                 </div>
-                <!-- Kontrol Butonları -->
-                <div class="d-flex justify-content-between mb-2">
-                    <button class="btn btn-sm btn-outline-light fullscreen-btn" data-target-id="camera-feed-{{ first_camera.id }}"><i class="fas fa-expand me-1"></i>Tam Ekran</button>
-                    <button class="btn btn-sm btn-outline-primary capture-photo-btn" data-id="{{ first_camera.id }}"><i class="fas fa-camera me-1"></i>Fotoğraf Çek</button>
-                    <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ first_camera.id }}"><i class="fas fa-cog me-1"></i>Ayarlar</button>
+                {% else %}
+                <div class="glass-card mb-4 d-flex align-items-center justify-content-center" style="height: 500px;">
+                    <p class="text-muted">Görüntülenecek kamera yok.</p>
                 </div>
-            </div>
-            {% else %}
-            <div class="glass-card mb-4 d-flex align-items-center justify-content-center" style="height: 500px;">
-                <p class="text-muted">Görüntülenecek kamera yok.</p>
-            </div>
-            {% endif %}
+                {% endif %}
+            {% endwith %}
         </div>
-
         <!-- Sağ Taraf: İstatistik Kartları (2x2 Grid) -->
         <div class="col-lg-4">
             <div class="row">
