@@ -1,5 +1,7 @@
+from argparse import Action
+from threading import Condition
 from rest_framework import serializers
-from .models import Device, Sensor, SensorReading
+from .models import Device, Rule, Sensor, SensorReading
 
 # --- API Konfigürasyonu için Serializer'lar ---
 # Agent'ın başlangıçta konfigürasyon çekmesi için kullanılır.
@@ -71,3 +73,48 @@ class AnalyticsDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = SensorReading
         fields = ['timestamp', 'value']
+
+class ConditionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Condition
+        fields = ['id', 'variable_key', 'operator', 'comparison_value']
+
+class ActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Action
+        fields = ['id', 'action_type', 'recipients', 'config']
+
+class RuleSerializer(serializers.ModelSerializer):
+    # İç içe geçmiş verileri yönetmek için
+    conditions = ConditionSerializer(many=True)
+    actions = ActionSerializer(many=True)
+
+    class Meta:
+        model = Rule
+        fields = [
+            'id', 'name', 'description', 'trigger_sensor', 
+            'is_active', 'cooldown_minutes', 'conditions', 'actions'
+        ]
+
+    def create(self, validated_data):
+        conditions_data = validated_data.pop('conditions')
+        actions_data = validated_data.pop('actions')
+        rule = Rule.objects.create(**validated_data)
+        for condition_data in conditions_data:
+            Condition.objects.create(rule=rule, **condition_data)
+        for action_data in actions_data:
+            recipients = action_data.pop('recipients', [])
+            action = Action.objects.create(rule=rule, **action_data)
+            action.recipients.set(recipients)
+        return rule
+
+    def update(self, instance, validated_data):
+        # Bu metod, düzenleme işlevi için daha sonra detaylandırılabilir.
+        # Şimdilik temel güncelleme yeterli.
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        # ... diğer alanlar ...
+        instance.save()
+        # Not: İç içe geçmiş koşul/eylem güncellemesi daha karmaşıktır.
+        # Bu adımda şimdilik oluşturma ve listelemeye odaklanalım.
+        return instance

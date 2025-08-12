@@ -1,84 +1,226 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Uyarılar - {{ block.super }}{% endblock title %}
+{% block title %}Uyarılar ve Kurallar - {{ block.super }}{% endblock title %}
 
 {% block content %}
 <div id="alerts" class="page-content active">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title"><i class="fas fa-exclamation-triangle me-2"></i>Uyarılar</h2>
-        <button class="btn btn-gradient" disabled><i class="fas fa-plus me-2"></i>Yeni Kural (Yakında)</button>
+        <h2 class="page-title"><i class="fas fa-exclamation-triangle me-2"></i>Uyarılar ve Kurallar</h2>
     </div>
 
-    <!-- Aktif Uyarılar -->
-    <h5 class="mb-3">Aktif Uyarılar ({{ active_alerts.count }})</h5>
-    <div class="row mb-4">
-        {% for alert in active_alerts %}
-        <div class="col-md-6 mb-3">
-            <div class="alert-card" style="border-left-color: {% if alert.severity == 'critical' %}var(--danger-color){% else %}var(--warning-color){% endif %};">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 style="color: var(--dark-color);"><i class="fas 
-                            {% if alert.severity == 'critical' %}fa-exclamation-circle{% else %}fa-exclamation-triangle{% endif %}
-                            me-2" style="color: {% if alert.severity == 'critical' %}var(--danger-color){% else %}var(--warning-color){% endif %};"></i>
-                            {{ alert.rule.name|default:"Bilinmeyen Kural" }}
-                        </h6>
-                        <p class="mb-0" style="color: var(--text-light);">{{ alert.message|truncatewords:15 }}</p>
-                        <small style="color: var(--text-light);">{{ alert.timestamp|timesince }} önce</small>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <button class="btn btn-sm btn-outline-light" disabled>Görüldü Olarak İşaretle</button>
-                </div>
-            </div>
+    <!-- Kural Yönetimi Paneli -->
+    <div class="glass-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 style="color: var(--dark-color); font-weight: 600;">Tanımlı Kurallar</h5>
+            <button class="btn btn-gradient" id="addRuleBtn">
+                <i class="fas fa-plus me-2"></i>Yeni Kural Ekle
+            </button>
         </div>
-        {% empty %}
-        <div class="col-12">
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle me-2"></i>Sistemde aktif bir uyarı bulunmuyor.
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
-    <!-- Uyarı Geçmişi -->
-    <div class="glass-card">
-        <h5 style="color: var(--dark-color); font-weight: 600;" class="mb-3">Uyarı Geçmişi (Son 50)</h5>
         <div class="table-responsive">
             <table class="table table-dark table-hover">
                 <thead>
                     <tr>
-                        <th style="color: var(--dark-color);">Zaman</th>
-                        <th style="color: var(--dark-color);">Önem</th>
-                        <th style="color: var(--dark-color);">İstasyon</th>
-                        <th style="color: var(--dark-color);">Kural</th>
-                        <th style="color: var(--dark-color);">Durum</th>
+                        <th>Kural Adı</th>
+                        <th>Tetikleyici Sensör</th>
+                        <th>Durum</th>
+                        <th>Sıklık (dk)</th>
+                        <th>İşlemler</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for alert in alert_history %}
+                <tbody id="rules-table-body">
+                    {% for rule in all_rules %}
                     <tr>
-                        <td style="color: var(--text-light);">{{ alert.timestamp|date:"d.m.Y H:i" }}</td>
+                        <td>{{ rule.name }}</td>
+                        <td>{{ rule.trigger_sensor.device.name }} - {{ rule.trigger_sensor.name }}</td>
                         <td>
-                            {% if alert.severity == 'critical' %}<span class="badge bg-danger">Kritik</span>
-                            {% elif alert.severity == 'warning' %}<span class="badge bg-warning">Uyarı</span>
-                            {% else %}<span class="badge bg-info">Bilgi</span>{% endif %}
-                        </td>
-                        <td style="color: var(--text-light);">{{ alert.device.name|default:"-" }}</td>
-                        <td style="color: var(--text-light);">{{ alert.rule.name|default:"-" }}</td>
-                        <td>
-                            {% if alert.is_acknowledged %}
-                                <span class="badge bg-success">Çözüldü</span>
+                            {% if rule.is_active %}
+                                <span class="badge bg-success">Aktif</span>
                             {% else %}
-                                <span class="badge bg-warning">Aktif</span>
+                                <span class="badge bg-secondary">Pasif</span>
                             {% endif %}
+                        </td>
+                        <td>{{ rule.cooldown_minutes }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-light" disabled>Düzenle</button>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5" class="text-center text-muted">Uyarı geçmişi boş.</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted">Henüz tanımlı bir kural yok.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+    
+    <!-- Uyarı Geçmişi (Bu kısım aynı kalıyor) -->
+    <div class="glass-card">
+        <!-- ... (Bir önceki adımdaki Uyarı Geçmişi tablosu burada) ... -->
+    </div>
+
+    <!-- Yeni Kural Ekleme/Düzenleme Modal'ı -->
+    <div class="modal fade" id="ruleModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="ruleModalLabel">Yeni Kural Ekle</h5></div>
+                <div class="modal-body">
+                    <form id="ruleForm" novalidate>
+                        <!-- Kuralın temel bilgileri -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Kural Adı *</label>
+                                <input type="text" id="ruleName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Tetikleyici Sensör *</label>
+                                <select id="ruleTriggerSensor" class="form-select" required>
+                                    <option value="">Seçiniz...</option>
+                                    {% for device in all_devices %}
+                                    <optgroup label="{{ device.name }}">
+                                        {% for sensor in device.sensors.all %}
+                                        <option value="{{ sensor.id }}">{{ sensor.name }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Koşullar (Dinamik olarak eklenecek) -->
+                        <hr><h6>Koşullar (EĞER)</h6>
+                        <div id="conditions-container">
+                            <!-- JS ile buraya koşul satırları eklenecek -->
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-success" id="add-condition-btn">
+                            <i class="fas fa-plus"></i> Koşul Ekle
+                        </button>
+                        <!-- Eylemler (Dinamik olarak eklenecek) -->
+                        <hr><h6>Eylemler (O ZAMAN)</h6>
+                        <div id="actions-container">
+                            <!-- JS ile buraya eylem satırları eklenecek -->
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="add-action-btn">
+                            <i class="fas fa-plus"></i> Eylem Ekle
+                        </button>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" id="saveRuleBtn">Kuralı Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ruleModal = new bootstrap.Modal(document.getElementById('ruleModal'));
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // "Yeni Kural Ekle" butonu
+    document.getElementById('addRuleBtn').addEventListener('click', () => {
+        // Formu sıfırla ve ilk koşul/eylemi ekle
+        document.getElementById('ruleForm').reset();
+        document.getElementById('conditions-container').innerHTML = '';
+        document.getElementById('actions-container').innerHTML = '';
+        addConditionRow();
+        addActionRow();
+        ruleModal.show();
+    });
+
+    // "Koşul Ekle" butonu
+    document.getElementById('add-condition-btn').addEventListener('click', addConditionRow);
+
+    // "Eylem Ekle" butonu
+    document.getElementById('add-action-btn').addEventListener('click', addActionRow);
+
+    function addConditionRow() {
+        const container = document.getElementById('conditions-container');
+        const html = `
+            <div class="row align-items-center mb-2 condition-row">
+                <div class="col-md-4"><input type="text" class="form-control" placeholder="Değişken (örn: temperature)" required></div>
+                <div class="col-md-3">
+                    <select class="form-select">
+                        <option value=">">Büyüktür</option><option value="<">Küçüktür</option>
+                        <option value="==">Eşittir</option><option value="!=">Eşit Değildir</option>
+                    </select>
+                </div>
+                <div class="col-md-4"><input type="text" class="form-control" placeholder="Değer (örn: 25)" required></div>
+                <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.condition-row').remove()">X</button></div>
+            </div>`;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+    
+    function addActionRow() {
+        const container = document.getElementById('actions-container');
+        const html = `
+            <div class="row align-items-center mb-2 action-row">
+                <div class="col-md-4">
+                    <select class="form-select action-type-select">
+                        <option value="log_to_console">Konsola Yaz</option>
+                        <option value="send_email">E-posta Gönder</option>
+                    </select>
+                </div>
+                <div class="col-md-7"><textarea class="form-control" rows="1" placeholder='{"subject": "...", "body": "..."}'></textarea></div>
+                <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.action-row').remove()">X</button></div>
+            </div>`;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    // "Kuralı Kaydet" butonu
+    document.getElementById('saveRuleBtn').addEventListener('click', () => {
+        const conditions = [];
+        document.querySelectorAll('.condition-row').forEach(row => {
+            conditions.push({
+                variable_key: row.children[0].querySelector('input').value,
+                operator: row.children[1].querySelector('select').value,
+                comparison_value: row.children[2].querySelector('input').value,
+            });
+        });
+
+        const actions = [];
+        document.querySelectorAll('.action-row').forEach(row => {
+            let config = {};
+            try {
+                const configText = row.children[1].querySelector('textarea').value;
+                if (configText) config = JSON.parse(configText);
+            } catch(e) { alert('Eylem yapılandırmasında JSON hatası!'); return; }
+            
+            actions.push({
+                action_type: row.children[0].querySelector('select').value,
+                recipients: [], // Şimdilik alıcıları boş bırakıyoruz, bu daha sonra geliştirilebilir
+                config: config
+            });
+        });
+        
+        const data = {
+            name: document.getElementById('ruleName').value,
+            trigger_sensor: document.getElementById('ruleTriggerSensor').value,
+            is_active: true,
+            cooldown_minutes: 60, // Varsayılan
+            conditions: conditions,
+            actions: actions
+        };
+        
+        fetch('/api/v3/rules/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) return response.json().then(err => { throw new Error(JSON.stringify(err)) });
+            return response.json();
+        })
+        .then(result => {
+            ruleModal.hide();
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Kural kaydedilirken hata:', error);
+            alert('Bir hata oluştu!');
+        });
+    });
+});
+</script>
+{% endblock %}

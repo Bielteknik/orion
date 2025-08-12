@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 # Modelleri import ediyoruz
-from .models import Alert, Device, Sensor, SensorReading
+from .models import Alert, Device, Rule, Sensor, SensorReading, Condition, Action
 
 # TÜM serializer'ları tek bir yerden, doğru dosyadan import ediyoruz
 from .serializers import (
@@ -24,6 +24,7 @@ from .serializers import (
     SensorReadingSerializer,
     DeviceSerializer,
     SensorSerializer,
+    RuleSerializer
 )
 
 # Kural motorunu import ediyoruz
@@ -135,6 +136,14 @@ class SensorsView(LoginRequiredMixin, View):
         }
         return render(request, 'sensors.html', context)
 
+class RuleViewSet(viewsets.ModelViewSet):
+    """
+    Kuralları, koşulları ve eylemleri yönetmek için API endpoint'leri.
+    """
+    queryset = Rule.objects.prefetch_related('conditions', 'actions').all()
+    serializer_class = RuleSerializer
+    permission_classes = [IsAuthenticated]
+
 class CamerasView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
     def get(self, request):
@@ -153,14 +162,10 @@ class MapView(LoginRequiredMixin, View):
 class AlertsView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
     def get(self, request):
-        # Tüm çözülmemiş (acknowledged=False) uyarıları al
-        active_alerts = Alert.objects.filter(is_acknowledged=False).select_related('rule', 'device')
-        # Tüm uyarıları (geçmiş) al
-        alert_history = Alert.objects.all().select_related('rule', 'device')[:50] # Son 50 taneyi göster
-        
         context = {
-            'active_alerts': active_alerts,
-            'alert_history': alert_history,
+            'all_rules': Rule.objects.all().order_by('name'),
+            'all_devices': Device.objects.prefetch_related('sensors').all(),
+            'alert_history': Alert.objects.all()[:50],
         }
         return render(request, 'alerts.html', context)
 

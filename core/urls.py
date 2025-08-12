@@ -13,13 +13,15 @@ from .views import (
     MapView,
     AlertsView,
     SettingsView,
-    AnalyticsDataView
+    AnalyticsDataView,
+    RuleViewSet
 )
-
 # Router'ı burada tanımlıyoruz, tıpkı daha önce olduğu gibi.
 router = DefaultRouter()
 router.register(r'devices', DeviceViewSet, basename='device')
 router.register(r'sensors', SensorViewSet, basename='sensor')
+router.register(r'rules', RuleViewSet, basename='rule')
+
 
 # TÜM URL'leri tek bir listede birleştiriyoruz.
 urlpatterns = [
