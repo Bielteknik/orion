@@ -59,6 +59,13 @@ class CameraViewSet(viewsets.ModelViewSet):
         camera = self.get_object()
         Command.objects.create(device=camera.device, command_type='capture_photo', payload={'camera_id': camera.id, 'rtsp_url': camera.rtsp_url})
         return Response({'status': 'capture command sent'}, status=202)
+    
+    @action(detail=True, methods=['post'])
+    def toggle_recording(self, request, pk=None):
+        camera = self.get_object()
+        camera.is_recording = not camera.is_recording
+        camera.save(update_fields=['is_recording'])
+        return Response({'status': 'recording toggled', 'is_recording': camera.is_recording})    
 
 class CommandViewSet(viewsets.ModelViewSet):
     serializer_class = CommandSerializer; permission_classes = [IsAuthenticated]
@@ -130,11 +137,19 @@ class SensorsView(LoginRequiredMixin, View):
 class CamerasView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
     def get(self, request):
+        all_cameras = Camera.objects.select_related('device').all()
+        # Her kameranın cihazının son sensör verisini bir sözlükte toplayalım
+        all_readings = {}
+        for cam in all_cameras:
+            if cam.device_id not in all_readings:
+                lr = SensorReading.objects.filter(sensor__device_id=cam.device_id).order_by('-timestamp').first()
+                if lr: all_readings[cam.device_id] = lr        
         context = {
-            'all_cameras': Camera.objects.select_related('device').all(),
+            'all_cameras': all_cameras,
             'all_devices': Device.objects.all(),
             'recent_captures': CameraCapture.objects.all()[:6],
-            'stats': {
+            'all_camera_readings': all_readings, # Yeni context değişkeni
+            'stats': { 
                 'active_cameras': Camera.objects.filter(status='active').count(),
                 'recording_cameras': Camera.objects.filter(is_recording=True).count(),
                 'captures_today': CameraCapture.objects.filter(timestamp__date=timezone.now().date()).count(),

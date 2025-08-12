@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}Kameralar - {{ block.super }}{% endblock title %}
 
 {% block content %}
@@ -53,42 +54,58 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 style="color: var(--dark-color); font-weight: 600;"><i class="fas fa-video me-2"></i>{{ camera.device.name }} - {{ camera.name }}</h5>
                     <div>
-                        {% if camera.status == 'active' %}<span class="badge bg-success">Aktif</span>
-                        {% elif camera.status == 'maintenance' %}<span class="badge bg-warning">Bakım</span>
-                        {% else %}<span class="badge bg-danger">Offline</span>{% endif %}
+                        <button class="btn btn-sm {% if camera.status == 'active' %}btn-success play-stream-btn{% else %}btn-secondary{% endif %}" 
+                                {% if camera.status != 'active' %}disabled{% endif %}
+                                data-feed-url="{% url 'camera-feed' camera.pk %}"
+                                data-target-id="camera-feed-{{ camera.id }}">
+                            <i class="fas fa-play me-1"></i>Canlı
+                        </button>
+                        <span class="badge bg-info">4K</span>
                     </div>
                 </div>
-                <div class="bg-dark rounded mb-3 position-relative" style="height: 200px; overflow: hidden;">
-                    {% if camera.status == 'active' %}
-                        <!-- MJPEG yayını için <img> etiketi kullanılır -->
-                        <img src="{% url 'camera-feed' camera.pk %}" width="100%" height="100%" style="object-fit: cover;" 
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" alt="Canlı Yayın">
-                        <div class="text-center text-white position-absolute top-0 start-0 w-100 h-100" 
-                             style="display: none; align-items: center; justify-content: center; background: #343a40;">
-                            <i class="fas fa-video-slash fa-2x me-2"></i> Yayın Yüklenemedi
+                <div class="bg-dark rounded mb-3 position-relative camera-feed-container" style="height: 200px;">
+                    <div id="camera-feed-{{ camera.id }}" class="w-100 h-100">
+                        <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center">
+                            {% if camera.status == 'active' %}
+                            <i class="fas fa-play-circle fa-3x mb-2"></i>
+                            <p>Canlı Yayını Başlat</p>
+                            {% else %}
+                            <i class="fas fa-exclamation-triangle fa-3x mb-2"></i>
+                            <p>Kamera {{ camera.get_status_display }}</p>
+                            {% endif %}
                         </div>
-                    {% else %}
-                        <div class="h-100 d-flex align-items-center justify-content-center text-white" style="background: #6c757d;">
-                             <i class="fas fa-exclamation-triangle fa-2x me-2"></i> Kamera {{ camera.get_status_display }}
-                        </div>
+                    </div>
+                    {% if camera.is_recording %}
+                    <div class="position-absolute top-0 start-0 m-2 rec-indicator">
+                        <span class="badge bg-danger"><i class="fas fa-circle me-1" style="animation: blink 1s infinite;"></i>REC</span>
+                    </div>
                     {% endif %}
+                    <div class="position-absolute bottom-0 end-0 m-2">
+                        <small class="text-white bg-dark bg-opacity-75 px-2 py-1 rounded camera-timestamp"></small>
+                    </div>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
-                    <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-expand me-1"></i>Tam Ekran</button>
-                    <!-- Fotoğraf Çek Butonu Artık Çalışıyor -->
-                    <button class="btn btn-sm btn-outline-primary capture-photo-btn" data-id="{{ camera.id }}">
-                        <i class="fas fa-camera me-1"></i>Fotoğraf Çek
+                    <button class="btn btn-sm btn-outline-light fullscreen-btn" data-target-id="camera-feed-{{ camera.id }}"><i class="fas fa-expand me-1"></i>Tam Ekran</button>
+                    <button class="btn btn-sm btn-outline-primary capture-photo-btn" data-id="{{ camera.id }}"><i class="fas fa-camera me-1"></i>Fotoğraf Çek</button>
+                    <button class="btn btn-sm btn-outline-light toggle-record-btn" data-id="{{ camera.id }}">
+                        {% if camera.is_recording %}<i class="fas fa-stop me-1"></i>Durdur{% else %}<i class="fas fa-play me-1"></i>Kayıt{% endif %}
                     </button>
-                    <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-play me-1"></i>Kayıt</button>
                     <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ camera.id }}"><i class="fas fa-cog me-1"></i>Ayarlar</button>
                 </div>
+                {% with reading=all_camera_readings|get_item:camera.device_id %}
+                <div class="row text-center" style="font-size: 12px; color: var(--text-light);">
+                    <div class="col-3"><i class="fas fa-thermometer-half me-1"></i>{{ reading.value.temperature|floatformat:1|default:"-" }}°C</div>
+                    <div class="col-3"><i class="fas fa-eye me-1"></i>-</div>
+                    <div class="col-3"><i class="fas fa-wind me-1"></i>-</div>
+                    <div class="col-3"><i class="fas fa-snowflake me-1"></i>-</div>
+                </div>
+                {% endwith %}
             </div>
         </div>        
         {% empty %}
         <div class="col-12"><div class="alert alert-info">Sistemde kayıtlı kamera bulunmuyor.</div></div>
         {% endfor %}
     </div>
-
     <!-- Son Çekilen Fotoğraflar -->
     <div class="glass-card">
         <h5 style="color: var(--dark-color); font-weight: 600;" class="mb-3">Son Çekilen Fotoğraflar</h5>
@@ -159,6 +176,50 @@
 <script>
 $(document).ready(function() {
     const cameraModal = new bootstrap.Modal(document.getElementById('cameraModal'));
+    const csrftoken = $('[name=csrfmiddlewaretoken]').val();
+    let timestampIntervals = {};
+
+    // Canlı Yayını Başlat
+    $('.play-stream-btn').on('click', function() {
+        const url = $(this).data('feed-url');
+        const targetId = $(this).data('target-id');
+        const container = $(`#${targetId}`);
+        container.html(`<img src="${url}" width="100%" height="100%" style="object-fit: cover;" alt="Canlı Yayın">`);
+        
+        // Zaman damgasını güncelle
+        const timestampEl = container.closest('.camera-feed-container').find('.camera-timestamp');
+        if (timestampIntervals[targetId]) clearInterval(timestampIntervals[targetId]);
+        timestampIntervals[targetId] = setInterval(() => {
+            timestampEl.text(new Date().toLocaleTimeString('tr-TR'));
+        }, 1000);
+    });
+
+    // Tam Ekran
+    $('.fullscreen-btn').on('click', function() {
+        const targetId = $(this).data('target-id');
+        const videoElement = $(`#${targetId} img`)[0];
+        if (videoElement && videoElement.requestFullscreen) {
+            videoElement.requestFullscreen();
+        }
+    });
+
+    // Kayıt Durumunu Değiştir
+    $('.toggle-record-btn').on('click', function() {
+        const cameraId = $(this).data('id');
+        const btn = $(this);
+        $.ajax({
+            url: `/api/v3/cameras/${cameraId}/toggle_recording/`, method: 'POST',
+            headers: {'X-CSRFToken': csrftoken},
+            success: function(data) {
+                if (data.is_recording) {
+                    btn.html('<i class="fas fa-stop me-1"></i>Durdur');
+                    // Gerekirse REC göstergesini dinamik olarak ekle
+                } else {
+                    btn.html('<i class="fas fa-play me-1"></i>Kayıt');
+                }
+            }
+        });
+    });
 
     $('[data-bs-target="#cameraModal"]').on('click', function() {
         $('#cameraForm')[0].reset();

@@ -61,8 +61,19 @@ class RuleSerializer(serializers.ModelSerializer):
 
 class CameraSerializer(serializers.ModelSerializer):
     device_name = serializers.CharField(source='device.name', read_only=True)
+    device_last_reading = serializers.SerializerMethodField()
+
     class Meta:
-        model = Camera; fields = '__all__'
+        model = Camera
+        fields = '__all__'
+
+    def get_device_last_reading(self, obj):
+        # Kameranın bağlı olduğu cihazın (obj.device) son okumasını bul
+        last_reading = SensorReading.objects.filter(sensor__device=obj.device).order_by('-timestamp').first()
+        if last_reading:
+            # SimpleReadingSerializer'ı kullanarak veriyi serileştir
+            return SimpleReadingSerializer(last_reading).data
+        return None
 
 class CommandSerializer(serializers.ModelSerializer):
     class Meta:
