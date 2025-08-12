@@ -54,7 +54,11 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>Zaman</th><th>Önem</th><th>İstasyon</th><th>Kural</th><th>Durum</th>
+                        <th>Zaman</th>
+                        <th>Önem</th>
+                        <th>İstasyon</th>
+                        <th>Kural</th>
+                        <th>Durum</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,8 +72,10 @@
                         </td>
                         <td>{{ alert.device.name|default:"-" }}</td>
                         <td>{{ alert.rule.name|default:"-" }}</td>
-                        <td>{% if alert.is_acknowledged %}<span class="badge bg-success">Çözüldü</span>
-                            {% else %}<span class="badge bg-warning">Aktif</span>{% endif %}</td>
+                        <td>
+                            {% if alert.is_acknowledged %}<span class="badge bg-success">Çözüldü</span>
+                            {% else %}<span class="badge bg-warning">Aktif</span>{% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="5" class="text-center text-muted">Uyarı geçmişi boş.</td></tr>
@@ -83,23 +89,38 @@
     <div class="modal fade" id="ruleModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">Yeni Kural Ekle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ruleModalLabel">Yeni Kural Ekle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
                 <div class="modal-body">
                     <form id="ruleForm" novalidate>
                         <div class="row">
-                            <div class="col-md-6 mb-3"><label class="form-label">Kural Adı *</label><input type="text" id="ruleName" class="form-control" required></div>
-                            <div class="col-md-6 mb-3"><label class="form-label">Tetikleyici Sensör *</label>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Kural Adı *</label>
+                                <input type="text" id="ruleName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Tetikleyici Sensör *</label>
                                 <select id="ruleTriggerSensor" class="form-select" required>
-                                    <option value="">Seçiniz...</option>
-                                    {% for device in all_devices %}<optgroup label="{{ device.name }}">
-                                        {% for sensor in device.sensors.all %}<option value="{{ sensor.id }}">{{ sensor.name }}</option>{% endfor %}
-                                    </optgroup>{% endfor %}
+                                    <option value="" disabled selected>Seçiniz...</option>
+                                    {% for device in all_devices %}
+                                    <optgroup label="{{ device.name }}">
+                                        {% for sensor in device.sensors.all %}
+                                        <option value="{{ sensor.id }}">{{ sensor.name }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
-                        <hr><h6>Koşullar (EĞER)</h6><div id="conditions-container"></div>
+                        <hr>
+                        <h6>Koşullar (EĞER)</h6>
+                        <div id="conditions-container"></div>
                         <button type="button" class="btn btn-sm btn-outline-success" id="add-condition-btn"><i class="fas fa-plus"></i> Koşul Ekle</button>
-                        <hr><h6>Eylemler (O ZAMAN)</h6><div id="actions-container"></div>
+                        <hr>
+                        <h6>Eylemler (O ZAMAN)</h6>
+                        <div id="actions-container"></div>
                         <button type="button" class="btn btn-sm btn-outline-primary" id="add-action-btn"><i class="fas fa-plus"></i> Eylem Ekle</button>
                     </form>
                 </div>
@@ -115,59 +136,59 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+$(document).ready(function() {
     const ruleModal = new bootstrap.Modal(document.getElementById('ruleModal'));
-    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    
-    document.querySelector('[data-bs-target="#ruleModal"]').addEventListener('click', () => {
-        document.getElementById('ruleForm').reset();
-        document.getElementById('conditions-container').innerHTML = '';
-        document.getElementById('actions-container').innerHTML = '';
+    const csrftoken = $('[name=csrfmiddlewaretoken]').val();
+
+    // Modal açılmadan önce formu sıfırla ve ilk satırları ekle
+    $('#ruleModal').on('show.bs.modal', function() {
+        $('#ruleForm')[0].reset();
+        $('#conditions-container').html('');
+        $('#actions-container').html('');
         addConditionRow();
         addActionRow();
     });
-    document.getElementById('add-condition-btn').addEventListener('click', addConditionRow);
-    document.getElementById('add-action-btn').addEventListener('click', addActionRow);
+
+    // Buton tıklama olayları
+    $('#add-condition-btn').on('click', addConditionRow);
+    $('#add-action-btn').on('click', addActionRow);
+
+    // Dinamik olarak eklenen "Sil" butonları için olay delegasyonu
+    $('#conditions-container').on('click', '.remove-btn', function() { $(this).closest('.condition-row').remove(); });
+    $('#actions-container').on('click', '.remove-btn', function() { $(this).closest('.action-row').remove(); });
 
     function addConditionRow() {
-        const c = document.getElementById('conditions-container');
-        c.insertAdjacentHTML('beforeend', `<div class="row align-items-center mb-2 condition-row"><div class="col-md-4"><input type="text" class="form-control" placeholder="Değişken (örn: temperature)" required></div><div class="col-md-3"><select class="form-select"><option value=">">Büyüktür</option><option value="<">Küçüktür</option><option value="==">Eşittir</option><option value="!=">Eşit Değildir</option></select></div><div class="col-md-4"><input type="text" class="form-control" placeholder="Değer (örn: 25)" required></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.condition-row').remove()">X</button></div></div>`);
+        const html = `<div class="row align-items-center mb-2 condition-row"><div class="col-md-4"><input type="text" class="form-control" placeholder="Değişken (örn: temperature)" required></div><div class="col-md-3"><select class="form-select"><option value=">">Büyüktür</option><option value="<">Küçüktür</option><option value=">=">Büyük Eşit</option><option value="<=">Küçük Eşit</option><option value="==">Eşittir</option><option value="!=">Eşit Değildir</option></select></div><div class="col-md-4"><input type="text" class="form-control" placeholder="Değer (örn: 25)" required></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger remove-btn">X</button></div></div>`;
+        $('#conditions-container').append(html);
     }
     
     function addActionRow() {
-        const a = document.getElementById('actions-container');
-        a.insertAdjacentHTML('beforeend', `<div class="row align-items-center mb-2 action-row"><div class="col-md-4"><select class="form-select action-type-select"><option value="log_to_console">Konsola Yaz</option><option value="send_email">E-posta Gönder</option></select></div><div class="col-md-7"><textarea class="form-control" rows="1" placeholder='{"subject": "...", "body": "..."}'></textarea></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.action-row').remove()">X</button></div></div>`);
+        const html = `<div class="row align-items-center mb-2 action-row"><div class="col-md-4"><select class="form-select action-type-select"><option value="log_to_console">Konsola Yaz</option><option value="send_email">E-posta Gönder</option></select></div><div class="col-md-7"><textarea class="form-control" rows="1" placeholder='{"subject": "...", "body": "..."}'></textarea></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger remove-btn">X</button></div></div>`;
+        $('#actions-container').append(html);
     }
 
-    document.getElementById('saveRuleBtn').addEventListener('click', () => {
-        const conditions = Array.from(document.querySelectorAll('.condition-row')).map(row => ({
-            variable_key: row.children[0].querySelector('input').value,
-            operator: row.children[1].querySelector('select').value,
-            comparison_value: row.children[2].querySelector('input').value,
-        }));
-        const actions = Array.from(document.querySelectorAll('.action-row')).map(row => {
+    $('#saveRuleBtn').on('click', function() {
+        const conditions = $('.condition-row').map(function() { return { variable_key: $(this).find('input:first').val(), operator: $(this).find('select').val(), comparison_value: $(this).find('input:last').val() }; }).get();
+        const actions = $('.action-row').map(function() {
             let config = {};
-            try { const configText = row.children[1].querySelector('textarea').value; if (configText) config = JSON.parse(configText); } catch(e) { alert('JSON hatası!'); return null; }
-            return { action_type: row.children[0].querySelector('select').value, recipients: [], config: config };
-        }).filter(Boolean);
+            try { const configText = $(this).find('textarea').val(); if (configText) config = JSON.parse(configText); } catch(e) { alert('JSON hatası!'); return null; }
+            return { action_type: $(this).find('select').val(), recipients: [], config: config };
+        }).get().filter(Boolean);
 
-        if (actions.some(a => a === null)) return;
+        if (actions.length !== $('.action-row').length) return;
         
         const data = {
-            name: document.getElementById('ruleName').value,
-            trigger_sensor: document.getElementById('ruleTriggerSensor').value,
+            name: $('#ruleName').val(), trigger_sensor: $('#ruleTriggerSensor').val(),
             is_active: true, cooldown_minutes: 60,
             conditions: conditions, actions: actions
         };
         
-        fetch('/api/v3/rules/', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
-            body: JSON.stringify(data)
-        })
-        .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
-        .then(() => { ruleModal.hide(); location.reload(); })
-        .catch(error => { console.error(error); alert('Hata oluştu!'); });
+        $.ajax({
+            url: '/api/v3/rules/', method: 'POST', contentType: 'application/json',
+            headers: {'X-CSRFToken': csrftoken}, data: JSON.stringify(data),
+            success: function() { ruleModal.hide(); location.reload(); },
+            error: function(error) { console.error(error); alert('Hata oluştu!'); }
+        });
     });
 });
 </script>
