@@ -97,8 +97,10 @@ $(document).ready(function() {
             is_active: $('#cameraIsActive').is(':checked'),
         };
         $.ajax({
-            url: url, method: method, contentType: 'application/json',
-            headers: {'X-CSRFToken': csrftoken}, data: JSON.stringify(data),
+            url: url, 
+            method: method, 
+            contentType: 'application/json',
+            data: JSON.stringify(data),
             success: function() { cameraModal.hide(); location.reload(); },
             error: function() { alert('Hata oluştu!'); }
         });

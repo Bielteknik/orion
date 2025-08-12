@@ -34,6 +34,21 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
+    <script>
+        // Django'nun CSRF token'ını bir değişkene alıyoruz.
+        const csrftoken = '{{ csrf_token }}';
+
+        // jQuery'nin ajaxSetup fonksiyonu ile, gönderilen her AJAX isteğinin
+        // header'ına otomatik olarak CSRF token'ını eklemesini sağlıyoruz.
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                }
+            }
+        });
+    </script>    
+
     {% block extra_js %}{% endblock extra_js %}
 </body>
 </html>
