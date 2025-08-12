@@ -51,51 +51,51 @@
         <div class="col-md-6 mb-4">
             <div class="glass-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 style="color: var(--dark-color); font-weight: 600;">
-                        <i class="fas fa-map-marker-alt me-2"></i>{{ camera.device.name }} - {{ camera.name }}
-                    </h5>
+                    <h5 style="color: var(--dark-color); font-weight: 600;"><i class="fas fa-video me-2"></i>{{ camera.device.name }} - {{ camera.name }}</h5>
                     <div>
-                        {% if camera.is_active %}
-                            <span class="badge bg-success me-2">Canlı</span>
-                        {% else %}
-                            <span class="badge bg-secondary me-2">Offline</span>
-                        {% endif %}
-                        <span class="badge bg-info">HD</span> <!-- Bu şimdilik statik -->
+                        {% if camera.status == 'active' %}<span class="badge bg-success">Aktif</span>
+                        {% elif camera.status == 'maintenance' %}<span class="badge bg-warning">Bakım</span>
+                        {% else %}<span class="badge bg-danger">Offline</span>{% endif %}
                     </div>
                 </div>
                 <div class="bg-dark rounded mb-3 position-relative" style="height: 200px; display: flex; align-items-center; justify-content: center;">
-                    <div class="text-center text-white">
-                        <i class="fas fa-video-slash fa-3x mb-2"></i>
-                        <p>Canlı Yayın Entegrasyonu Yakında</p>
-                        <small>{{ camera.rtsp_url|truncatechars:30 }}</small>
-                    </div>
-                    {% if camera.is_recording %}
-                    <div class="position-absolute top-0 start-0 m-2">
-                        <span class="badge bg-danger">
-                            <i class="fas fa-circle me-1" style="animation: blink 1s infinite;"></i>REC
-                        </span>
-                    </div>
-                    {% endif %}
+                    <!-- Bu alan gelecekte canlı yayın için kullanılacak -->
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-expand me-1"></i>Tam Ekran</button>
-                    <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-camera me-1"></i>Fotoğraf Çek</button>
+                    <!-- Fotoğraf Çek Butonu Artık Çalışıyor -->
+                    <button class="btn btn-sm btn-outline-primary capture-photo-btn" data-id="{{ camera.id }}">
+                        <i class="fas fa-camera me-1"></i>Fotoğraf Çek
+                    </button>
                     <button class="btn btn-sm btn-outline-light" disabled><i class="fas fa-play me-1"></i>Kayıt</button>
                     <button class="btn btn-sm btn-outline-light edit-camera-btn" data-id="{{ camera.id }}"><i class="fas fa-cog me-1"></i>Ayarlar</button>
                 </div>
-                <!-- Alt bilgi çubuğu (şimdilik statik) -->
-                <div class="row text-center" style="font-size: 12px; color: var(--text-light);">
-                    <div class="col-3"><i class="fas fa-thermometer-half me-1"></i>-</div>
-                    <div class="col-3"><i class="fas fa-eye me-1"></i>-</div>
-                    <div class="col-3"><i class="fas fa-wind me-1"></i>-</div>
-                    <div class="col-3"><i class="fas fa-snowflake me-1"></i>-</div>
-                </div>
             </div>
-        </div>
+        </div>        
         {% empty %}
         <div class="col-12"><div class="alert alert-info">Sistemde kayıtlı kamera bulunmuyor.</div></div>
         {% endfor %}
     </div>
+
+    <!-- Son Çekilen Fotoğraflar -->
+    <div class="glass-card">
+        <h5 style="color: var(--dark-color); font-weight: 600;" class="mb-3">Son Çekilen Fotoğraflar</h5>
+        <div class="row" id="recentPhotos">
+            {% for capture in recent_captures %}
+            <div class="col-md-2 mb-3">
+                <div class="card bg-dark text-white">
+                    <img src="{{ capture.image.url }}" class="card-img-top" style="height: 100px; object-fit: cover;">
+                    <div class="card-img-overlay d-flex flex-column justify-content-end p-2" style="background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);">
+                        <small class="card-title" style="font-size: 0.8em;">{{ capture.camera.name }}</small>
+                        <small class="text-muted" style="font-size: 0.7em;">{{ capture.timestamp|timesince }} önce</small>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-muted">Henüz çekilmiş fotoğraf yok.</p>
+            {% endfor %}
+        </div>
+    </div>    
 </div>
 
 <!-- Yeni Kamera Ekleme/Düzenleme Modal'ı -->
@@ -166,6 +166,21 @@ $(document).ready(function() {
             $('#cameraIsActive').prop('checked', data.is_active);
             $('#cameraModalLabel').text('Kamera Düzenle');
             cameraModal.show();
+        });
+    });
+    $('.capture-photo-btn').on('click', function() {
+        const cameraId = $(this).data('id');
+        const btn = $(this);
+        btn.html('<span class="spinner-border spinner-border-sm"></span> Gönderiliyor...').prop('disabled', true);
+
+        $.ajax({
+            url: `/api/v3/cameras/${cameraId}/capture_photo/`,
+            method: 'POST',
+            success: function() {
+                alert('Fotoğraf çekme komutu başarıyla gönderildi! Agentın işlemesi bekleniyor.');
+            },
+            error: function() { alert('Komut gönderilirken hata oluştu!'); },
+            complete: function() { btn.html('<i class="fas fa-camera me-1"></i>Fotoğraf Çek').prop('disabled', false); }
         });
     });
 });

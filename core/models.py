@@ -212,9 +212,18 @@ class Action(models.Model):
         verbose_name_plural = "Eylemler"
 
 class Camera(models.Model):
+    
+    STATUS_CHOICES = [
+        ('active', 'Aktif'),
+        ('maintenance', 'Bakım'),
+        ('offline', 'Offline'),
+    ]
+
     name = models.CharField(max_length=100, verbose_name="Kamera Adı")
     device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='cameras', verbose_name="Bağlı Olduğu İstasyon")
     rtsp_url = models.CharField(max_length=500, verbose_name="RTSP URL")
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='active', verbose_name="Durum")
+
     is_active = models.BooleanField(default=True, verbose_name="Aktif mi?")
     is_recording = models.BooleanField(default=False, verbose_name="Kayıt Yapıyor mu?")
     
@@ -229,4 +238,21 @@ class Camera(models.Model):
         verbose_name_plural = "Kameralar"
         unique_together = ('device', 'name')
 
+class CameraCapture(models.Model):
+    camera = models.ForeignKey(Camera, on_delete=models.CASCADE, related_name='captures')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    # Fotoğraf dosyası media klasörüne kaydedilecek
+    image = models.ImageField(upload_to='camera_captures/%Y/%m/%d/')
+    
+    class Meta:
+        ordering = ['-timestamp']
 
+class Command(models.Model):
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='commands')
+    command_type = models.CharField(max_length=50) # örn: 'capture_photo'
+    payload = models.JSONField(default=dict) # örn: {'camera_id': 1}
+    is_executed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
