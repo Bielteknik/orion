@@ -1,7 +1,7 @@
 from argparse import Action
 from threading import Condition
 from rest_framework import serializers
-from .models import Device, Rule, Sensor, SensorReading
+from .models import Camera, Device, Rule, Sensor, SensorReading
 
 # --- API Konfigürasyonu için Serializer'lar ---
 # Agent'ın başlangıçta konfigürasyon çekmesi için kullanılır.
@@ -118,3 +118,10 @@ class RuleSerializer(serializers.ModelSerializer):
         # Not: İç içe geçmiş koşul/eylem güncellemesi daha karmaşıktır.
         # Bu adımda şimdilik oluşturma ve listelemeye odaklanalım.
         return instance
+    
+
+class CameraSerializer(serializers.ModelSerializer):
+    device_name = serializers.CharField(source='device.name', read_only=True)
+    class Meta:
+        model = Camera
+        fields = '__all__'

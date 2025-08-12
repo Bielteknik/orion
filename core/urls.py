@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
+    CameraViewSet,
     DeviceConfigView, 
     SubmitReadingView, 
     DashboardView, 
@@ -21,7 +22,7 @@ router = DefaultRouter()
 router.register(r'devices', DeviceViewSet, basename='device')
 router.register(r'sensors', SensorViewSet, basename='sensor')
 router.register(r'rules', RuleViewSet, basename='rule')
-
+router.register(r'cameras', CameraViewSet, basename='camera')
 
 # TÜM URL'leri tek bir listede birleştiriyoruz.
 urlpatterns = [

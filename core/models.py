@@ -210,3 +210,23 @@ class Action(models.Model):
     class Meta:
         verbose_name = "Eylem"
         verbose_name_plural = "Eylemler"
+
+class Camera(models.Model):
+    name = models.CharField(max_length=100, verbose_name="Kamera Adı")
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='cameras', verbose_name="Bağlı Olduğu İstasyon")
+    rtsp_url = models.CharField(max_length=500, verbose_name="RTSP URL")
+    is_active = models.BooleanField(default=True, verbose_name="Aktif mi?")
+    is_recording = models.BooleanField(default=False, verbose_name="Kayıt Yapıyor mu?")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.device.name} - {self.name}"
+
+    class Meta:
+        verbose_name = "Kamera"
+        verbose_name_plural = "Kameralar"
+        unique_together = ('device', 'name')
+
+
