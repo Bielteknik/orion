@@ -1,6 +1,6 @@
 <div class="col-md-6 mb-4" id="station-card-{{ device_info.device.id }}">
+    <a href="{% url 'dashboard' device_id=device_info.device.id %}" class="text-decoration-none">
     <div class="glass-card">
-        <!-- ... (kartın üst kısmı aynı) ... -->
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 style="color: var(--dark-color); font-weight: 600;">{{ device_info.device.name }}</h5>
             {% if device_info.device.is_active %}
@@ -25,4 +25,5 @@
             </button>
         </div>
     </div>
+    </a>
 </div>

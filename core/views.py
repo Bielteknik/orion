@@ -93,23 +93,33 @@ class AnalyticsDataView(APIView):
         return Response(data)
 
 # --- Frontend Views ---
+
 class DashboardView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
-    def get(self, request):
-        try: device = request.user.device
-        except: return render(request, 'dashboard.html', {'error': 'Cihaz bulunamadı.'})
-        # ... (Geri kalanı bir öncekiyle aynı)
-        last_reading = SensorReading.objects.filter(sensor__device=device).order_by('-timestamp').first()
-        recent_readings = SensorReading.objects.filter(sensor__device=device).order_by('-timestamp')[:5]
-        time_threshold = timezone.now() - timedelta(hours=24)
-        readings_for_chart = SensorReading.objects.filter(sensor__device=device, timestamp__gte=time_threshold).order_by('timestamp')
-        chart_labels = [r.timestamp.strftime('%H:%M') for r in readings_for_chart]
-        chart_temp_data = [r.value.get('temperature') for r in readings_for_chart if r.value and 'temperature' in r.value]
-        chart_hum_data = [r.value.get('humidity') for r in readings_for_chart if r.value and 'humidity' in r.value]
+
+    def get(self, request, device_id):
+        try:
+            # URL'den gelen ID'ye göre istenen cihazı bul
+            target_device = Device.objects.prefetch_related('sensors', 'cameras').get(id=device_id)
+        except Device.DoesNotExist:
+            return render(request, 'error.html', {'message': 'İstasyon bulunamadı.'})
+
+        # Dashboard'daki hızlı geçiş menüsü için tüm cihazların listesi
+        all_devices = Device.objects.all().order_by('name')
+
+        # Bu cihaza ait tüm sensörlerin son okumalarını al
+        sensor_readings = {}
+        for sensor in target_device.sensors.all():
+            last_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
+            sensor_readings[sensor.name] = last_reading # Sensör adına göre sakla
+
         context = {
-            'device': device, 'last_reading': last_reading, 'recent_readings': recent_readings,
-            'chart_labels': json.dumps(chart_labels), 'chart_temp_data': json.dumps(chart_temp_data),
-            'chart_hum_data': json.dumps(chart_hum_data),
+            'device': target_device,
+            'all_devices': all_devices,
+            'sensor_readings': sensor_readings,
+            'main_camera': target_device.cameras.first(), # İlk kamerayı ana kamera olarak al
+            # Geçmiş okumalar listesi (alt panel için)
+            'reading_history': SensorReading.objects.filter(sensor__device=target_device).select_related('sensor').order_by('-timestamp')[:50]
         }
         return render(request, 'dashboard.html', context)
 

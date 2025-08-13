@@ -6,7 +6,8 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', RedirectView.as_view(url='/dashboard/')),
+    path('', RedirectView.as_view(pattern_name='stations', permanent=False)),
+    #path('', RedirectView.as_view(url='/dashboard/')),
     
     # Tüm frontend ve API isteklerini tek bir include ile core uygulamasına yönlendir.
     path('', include('core.urls')),

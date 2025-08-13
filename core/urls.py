@@ -23,12 +23,13 @@ api_router.register(r'captures', CameraCaptureViewSet, basename='capture')
 # TÜM URL'leri tek bir listede birleştiriyoruz.
 urlpatterns = [
     # Frontend (Arayüz) URL'leri
-    path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    #path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('stations/<uuid:device_id>/dashboard/', DashboardView.as_view(), name='dashboard'),
     path('stations/', StationsView.as_view(), name='stations'),
     path('sensors/', SensorsView.as_view(), name='sensors'),
     path('cameras/', CamerasView.as_view(), name='cameras'),
     path('analytics/', AnalyticsView.as_view(), name='analytics'),
-    path('map/', MapView.as_view(), name='map'), # map.html yerine interactive_map.html kullanıyorsanız burayı düzeltin
+    path('map/', MapView.as_view(), name='map'),
     path('alerts/', AlertsView.as_view(), name='alerts'),
     path('settings/', SettingsView.as_view(), name='settings'),
     

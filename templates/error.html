@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block title %}Hata{% endblock %}
+{% block content %}
+<div class="alert alert-danger">
+    <h4>Bir Hata Oluştu</h4>
+    <p>{{ message|default:"Beklenmedik bir hata meydana geldi." }}</p>
+</div>
+{% endblock %}
