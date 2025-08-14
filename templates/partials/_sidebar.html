@@ -1,40 +1,90 @@
+{% comment %}
+
+{% endcomment %}
 <nav class="sidebar">
     <div class="p-4">
         <h4 class="mb-4" style="color: var(--primary-color); font-weight: 700;">
-            <i class="fas fa-snowflake me-2" style="color: var(--accent-color);"></i>
-            SNOW IOT
+            <a href="{% url 'stations' %}" class="text-decoration-none" style="color: inherit;">
+                <i class="fas fa-snowflake me-2" style="color: var(--accent-color);"></i>
+                <span>SNOW IOT</span>
+            </a>
         </h4>
         <ul class="nav flex-column">
+            
+            <!-- Dashboard Linki -->
             <li class="nav-item">
-                <!-- Django URL'lerini kullanacağız -->
-                <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
-                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                </a>
-                <a class="nav-link {% if request.resolver_match.url_name == 'stations' %}active{% endif %}" href="{% url 'stations' %}">
+                {% comment %}
+                    Mantık:
+                    - Eğer 'device' adında bir değişken context'te varsa (yani bir istasyonun
+                      detay sayfasındaysak, örn. dashboard veya kamera detay), bu link o
+                      istasyonun dashboard'una gider.
+                    - Eğer 'device' değişkeni yoksa (genel listeleme sayfaları), bu link
+                      kullanıcıyı istasyonları seçebileceği ana liste sayfasına yönlendirir.
+                {% endcomment %}
+                {% if device %}
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                       href="{% url 'dashboard' device_id=device.id %}">
+                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </a>
+                {% else %}
+                    <a class="nav-link" href="{% url 'stations' %}" title="Önce bir istasyon seçin">
+                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </a>
+                {% endif %}
+            </li>
+
+            <!-- İstasyonlar Linki -->
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'stations' %}active{% endif %}" 
+                   href="{% url 'stations' %}">
                     <i class="fas fa-building me-2"></i>İstasyonlar
                 </a>
-                <a class="nav-link {% if request.resolver_match.url_name == 'sensors' %}active{% endif %}" href="{% url 'sensors' %}">
+            </li>
+            
+            <!-- Sensörler Linki -->
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'sensors' %}active{% endif %}" 
+                   href="{% url 'sensors' %}">
                     <i class="fas fa-thermometer-half me-2"></i>Sensörler
                 </a>
-                <a class="nav-link {% if request.resolver_match.url_name == 'cameras' %}active{% endif %}" href="{% url 'cameras' %}">
+            </li>
+            
+            <!-- Kameralar Linki -->
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'cameras' %}active{% endif %}" 
+                   href="{% url 'cameras' %}">
                     <i class="fas fa-video me-2"></i>Kameralar
                 </a>
-                <a class="nav-link {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">
+            </li>
+            
+            <!-- Veri Analizi Linki -->
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" 
+                   href="{% url 'analytics' %}">
                     <i class="fas fa-chart-line me-2"></i>Veri Analizi
                 </a>
             </li>
+            
+            <!-- İnteraktif Harita Linki -->
             <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'map' %}active{% endif %}" href="{% url 'map' %}">
+                <a class="nav-link {% if request.resolver_match.url_name == 'map' %}active{% endif %}" 
+                   href="{% url 'map' %}">
                     <i class="fas fa-map me-2"></i>İnteraktif Harita
                 </a>
             </li>
+            
+            <!-- Uyarılar Linki -->
             <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'alerts' %}active{% endif %}" href="{% url 'alerts' %}">
+                <a class="nav-link {% if request.resolver_match.url_name == 'alerts' %}active{% endif %}" 
+                   href="{% url 'alerts' %}">
                     <i class="fas fa-exclamation-triangle me-2"></i>Uyarılar
                 </a>
             </li>
+            
+            <!-- Ayarlar Linki -->
             <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}">
+                <a class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" 
+                   href="{% url 'settings' %}">
                     <i class="fas fa-cog me-2"></i>Ayarlar
                 </a>
             </li>
