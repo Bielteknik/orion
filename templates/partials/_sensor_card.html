@@ -1,50 +1,39 @@
 {% with sensor=sensor_info.sensor reading=sensor_info.last_reading %}
 <div class="col-md-4 mb-3">
-    <div class="sensor-card 
+    <!-- DÜZELTME: Pasif ise kartı soluklaştır -->
+    <div class="sensor-card {% if not sensor.is_active %}opacity-50{% endif %} 
         {% if 'sıcaklık' in sensor.name|lower %}temperature{% endif %}
         {% if 'nem' in sensor.name|lower %}humidity{% endif %}">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6>{{ sensor.name }}</h6>
-            {% if sensor.is_active %}
-                <span class="badge bg-light text-dark">Aktif</span>
-            {% else %}
-                 <span class="badge bg-secondary">Pasif</span>
-            {% endif %}
-        </div>
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
+        
+        <div class="row">
+            <!-- Sol Taraf: Bilgiler -->
+            <div class="col-8">
+                <h6 class="text-truncate" title="{{ sensor.name }}">{{ sensor.name }}</h6>
                 {% if reading and reading.value %}
-                    <h3>
-                        <!-- DÜZELTME: Farklı veri yapılarını daha sağlam bir şekilde ele alalım -->
-                        {% if 'temperature' in reading.value %}
-                            {{ reading.value.temperature|floatformat:1 }}°C
-                        {% elif 'humidity' in reading.value %}
-                             {{ reading.value.humidity|floatformat:0 }}%
-                        {% elif 'distance_cm' in reading.value %}
-                            {{ reading.value.distance_cm|floatformat:1 }} cm
-                        {% elif 'value' in reading.value %}
-                            <!-- Ağırlık sensörü gibi tek değerli okumalar için -->
-                            {{ reading.value.value|floatformat:2 }} kg
-                        {% else %}
-                            <!-- Bilinmeyen formatlar için ilk anahtarın değerini göster -->
-                            {% for key, val in reading.value.items %}
-                                {% if forloop.first %}{{ val }}{% endif %}
-                            {% endfor %}
-                        {% endif %}
+                    <h3 class="fw-bold">
+                    {% for key, value in reading.value.items %}{% if forloop.first %}
+                        {{ value|floatformat:1 }} <small class="text-muted fs-6">{% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}</small>
+                    {% endif %}{% endfor %}
                     </h3>
                 {% else %}
-                    <h3>-</h3>
+                    <h3 class="fw-bold">-</h3>
                 {% endif %}
-                <small>{{ sensor.device.name }}</small>
+                <small class="text-muted">{{ sensor.device.name }}</small>
             </div>
-            <div class="text-end">
-                <i class="fas fa-thermometer-half fa-2x"></i>
-                <br>
-                <button class="btn btn-sm btn-outline-light mt-2 edit-sensor-btn" data-id="{{ sensor.id }}">
-                    <i class="fas fa-edit me-1"></i>Düzenle
-                </button>
+            <!-- Sağ Taraf: Durum ve Buton -->
+            <div class="col-4 d-flex flex-column align-items-end justify-content-between">
+                <div>
+                    {% if sensor.is_active %}
+                        <span class="badge bg-success">Aktif</span>
+                    {% else %}
+                         <span class="badge bg-secondary">Pasif</span>
+                    {% endif %}
+                </div>
+                <div><i class="fas fa-thermometer-half fa-2x text-muted"></i></div>
+                <div><button class="btn btn-sm btn-outline-light edit-sensor-btn" data-id="{{ sensor.id }}">Düzenle</button></div>
             </div>
         </div>
+
     </div>
 </div>
 {% endwith %}

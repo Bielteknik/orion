@@ -171,14 +171,25 @@ class StationsView(LoginRequiredMixin, View):
 class SensorsView(LoginRequiredMixin, View):
     login_url = '/admin/login/';
     def get(self, request):
-        did = request.GET.get('device', None)
-        qs = Sensor.objects.select_related('device').filter(is_active=True)
-        if did: qs = qs.filter(device_id=did)
-        data = []
-        for s in qs: data.append({'sensor': s, 'last_reading': SensorReading.objects.filter(sensor=s).order_by('-timestamp').first()})
+        all_devices = Device.objects.all()
+        selected_device_id = request.GET.get('device', None)
+        sensors_query = Sensor.objects.select_related('device').all()    
+        if selected_device_id:
+            sensors_query = sensors_query.filter(device_id=selected_device_id)
+
+        sensors_with_readings = []
+        for sensor in sensors_query:
+            last_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
+            sensors_with_readings.append({
+                'sensor': sensor,
+                'last_reading': last_reading
+            })
         context = {
-            'all_devices': Device.objects.all(), 'sensors_with_readings': data, 'selected_device_id': did,
-            'sensor_interface_choices': Sensor.INTERFACE_CHOICES, 'sensor_parser_choices': Sensor.PARSER_TYPE_CHOICES,
+            'all_devices': all_devices,
+            'sensors_with_readings': sensors_with_readings,
+            'selected_device_id': selected_device_id,
+            'sensor_interface_choices': Sensor.INTERFACE_CHOICES,
+            'sensor_parser_choices': Sensor.PARSER_TYPE_CHOICES,
         }
         return render(request, 'sensors.html', context)
 
