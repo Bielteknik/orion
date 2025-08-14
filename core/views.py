@@ -1,3 +1,4 @@
+import datetime
 from django.shortcuts import render
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -14,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.decorators import action
+from urllib3 import request
 
 from .models import Device, Sensor, SensorReading, Rule, Alert, Camera, Command, CameraCapture
 from .serializers import *
@@ -96,38 +98,46 @@ class AnalyticsDataView(APIView):
 
 class DashboardView(LoginRequiredMixin, View):
     login_url = '/admin/login/'
-
+    
     def get(self, request, device_id):
         try:
             target_device = Device.objects.prefetch_related('sensors', 'cameras').get(id=device_id)
         except Device.DoesNotExist:
-            # error.html'i daha sonra güzelleştirebiliriz.
             return render(request, 'error.html', {'message': 'İstasyon bulunamadı.'})
 
-        # Dashboard'un üstündeki "diğer istasyonlara geç" menüsü için
         all_devices_for_nav = Device.objects.exclude(id=device_id).order_by('name')
-
-        # Sensör kartları için her sensörün son okuması
         sensor_readings = {
             sensor.id: SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
             for sensor in target_device.sensors.all()
         }
 
-        # Alt kısımdaki "Sensör Verileri Listesi" için
-        reading_history = SensorReading.objects.filter(
-            sensor__device=target_device
-        ).select_related('sensor').order_by('-timestamp')[:50] # Son 50 kaydı alalım
+        # -- YENİ: TARİH FİLTRESİ MANTIĞI --
+        # URL'den 'filter_date' parametresini al (örn: ?filter_date=2025-08-14)
+        filter_date_str = request.GET.get('filter_date')
+        reading_history = SensorReading.objects.filter(sensor__device=target_device).select_related('sensor')
+
+        if filter_date_str:
+            try:
+                # Gelen string'i tarih nesnesine çevir ve o güne ait kayıtları filtrele
+                filter_date = datetime.strptime(filter_date_str, '%Y-%m-%d').date()
+                reading_history = reading_history.filter(timestamp__date=filter_date)
+            except (ValueError, TypeError):
+                # Geçersiz tarih formatı gelirse, filtreleme yapma
+                pass
+        # -- FİLTRE MANTIĞI BİTTİ --
 
         context = {
             'device': target_device,
             'all_devices_for_nav': all_devices_for_nav,
             'sensor_readings': sensor_readings,
             'main_camera': target_device.cameras.order_by('name').first(),
-            'reading_history': reading_history,
-            'captures_today_count': CameraCapture.objects.filter(
-                camera__device=target_device, 
-                timestamp__date=timezone.now().date()
-            ).count(),
+            # Filtrelenmiş veya tüm sonuçları şablona gönder (son 50 ile sınırla)
+            'reading_history': reading_history.order_by('-timestamp')[:50],
+            'captures_today_count': CameraCapture.objects.filter(camera__device=target_device, timestamp__date=timezone.now().date()).count(),
+            # Bugünün tarihini 'YYYY-AA-GG' formatında şablona gönder
+            'today_date': timezone.now().strftime('%Y-%m-%d'),
+            # Kullanıcının seçtiği tarihi de geri gönderelim ki input'ta gösterelim
+            'filtered_date': filter_date_str,
         }
         return render(request, 'dashboard.html', context)
 
