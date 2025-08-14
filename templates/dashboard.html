@@ -26,48 +26,34 @@
 <!-- Sol Taraf: 2x2 Sensör Kartları -->
     <div class="col-lg-4">
         <div class="row">
-            
             {% for card_data in sensor_cards %}
                 <div class="col-md-6 col-12 mb-4">
-                    <div class="glass-card h-100 text-center d-flex flex-column justify-content-center sensor-detail-trigger" 
-                         style="cursor: pointer; min-height: 150px;" 
-                         data-sensor-id="{{ card_data.sensor.id }}">
-                        
-                        <h5 class="mb-3 text-truncate" title="{{ card_data.sensor.name }}">{{ card_data.sensor.name }}</h5>
-                        
-                        {% with reading=card_data.reading %}
-                            {% if reading and reading.value %}
-                                {% for key, value in reading.value.items %}
-                                    {% if forloop.first %}
-                                        <h2 class="display-6 fw-bold">
-                                            {{ value|floatformat:1 }}
-                                            <small class="fs-5 text-muted">
-                                                {% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}
-                                            </small>
-                                        </h2>
-                                    {% endif %}
-                                {% endfor %}
-                            {% else %}
-                                <h2 class="display-6 fw-bold text-muted">-</h2>
-                            {% endif %}
-                        {% endwith %}
-                    </div>
+                    {% if card_data %}
+                        {# DOLU KART #}
+                        <div class="glass-card h-100 text-center d-flex flex-column justify-content-center sensor-detail-trigger" 
+                             style="cursor: pointer; min-height: 150px;" 
+                             data-sensor-id="{{ card_data.sensor.id }}">
+                            <h5 class="mb-3 text-truncate" title="{{ card_data.sensor.name }}">{{ card_data.sensor.name }}</h5>
+                            {% with reading=card_data.reading %}
+                                {% if reading and reading.value %}
+                                    {% for key, value in reading.value.items %}{% if forloop.first %}
+                                    <h2 class="display-6 fw-bold">{{ value|floatformat:1 }}<small class="fs-5 text-muted">{% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}</small></h2>
+                                    {% endif %}{% endfor %}
+                                {% else %}
+                                    <h2 class="display-6 fw-bold text-muted">-</h2>
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+                    {% else %}
+                        {# BOŞ KART #}
+                        <div class="glass-card h-100 d-none d-md-block" 
+                             style="min-height: 150px; border-style: dashed; background: rgba(255, 255, 255, 0.05);">
+                        </div>
+                    {% endif %}
                 </div>
             {% endfor %}
-
-            {# Boş alan sorununu çözmek için: Eğer 4'ten az sensör varsa, boşluk doldurma. #}
-            {# Örnek: 3 sensör varsa, 1 tane boş kart ekle. 1 sensör varsa, 3 tane ekle. #}
-            {% if sensor_cards|length < 4 %}
-                {% for _ in ""|center:sensor_cards|length|add:"-4"|add:"-" %}
-                <div class="col-md-6 col-12 mb-4 d-none d-md-block"> {# Sadece orta ve büyük ekranlarda görünür #}
-                     <div class="glass-card h-100" style="min-height: 150px; border-style: dashed; background: rgba(255, 255, 255, 0.05);"></div>
-                </div>
-                {% endfor %}
-            {% endif %}
-
         </div>
     </div>
-
     <!-- Sağ Taraf: Kamera Alanı -->
     <div class="col-lg-8">
         <div class="glass-card h-100 d-flex flex-column">

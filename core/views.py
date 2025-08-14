@@ -101,33 +101,41 @@ class DashboardView(LoginRequiredMixin, View):
 
     def get(self, request, device_id):
         try:
-            # URL'den gelen ID'ye göre istenen cihazı ve ilişkili sensörlerini/kameralarını al
+            # URL'den gelen ID'ye göre istenen cihazı ve ilişkili modellerini al
             target_device = Device.objects.prefetch_related('sensors', 'cameras').get(id=device_id)
         except Device.DoesNotExist:
             return render(request, 'error.html', {'message': 'İstasyon bulunamadı.'})
 
-        # Sayfanın üstündeki istasyon değiştirme menüsü için diğer tüm cihazlar
+        # Sayfanın üst kısmındaki istasyon değiştirme menüsü için diğer tüm cihazlar
         all_devices_for_nav = Device.objects.exclude(id=device_id).order_by('name')
 
-        # Sol taraftaki 2x2'lik grid için sensörleri ve son okumalarını al
-        # Sadece ilk 4 sensörü alıyoruz
-        sensors_for_cards = target_device.sensors.all()[:4]
+        # Sol taraftaki 2x2'lik grid için sensörleri al
+        sensors_for_cards = target_device.sensors.all()[:4] # Sadece ilk 4 sensör
         sensor_card_data = []
         for sensor in sensors_for_cards:
+            # Her sensör için son okumayı bul ve listeye ekle
             sensor_card_data.append({
                 'sensor': sensor,
                 'reading': SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
             })
-
+        
+        # Grid'i her zaman 4 elemana tamamla
+        num_existing_cards = len(sensor_card_data)
+        num_placeholders = 4 - num_existing_cards
+        if num_placeholders > 0:
+            sensor_card_data.extend([None] * num_placeholders)
+        
         # Sayfanın altındaki "Sensör Verileri Listesi" için geçmiş okumalar
         filter_date_str = request.GET.get('filter_date')
         reading_history = SensorReading.objects.filter(sensor__device=target_device).select_related('sensor')
 
         if filter_date_str:
             try:
+                # Gelen string'i tarih nesnesine çevir ve o güne ait kayıtları filtrele
                 filter_date = datetime.strptime(filter_date_str, '%Y-%m-%d').date()
                 reading_history = reading_history.filter(timestamp__date=filter_date)
             except (ValueError, TypeError):
+                # Geçersiz tarih formatı gelirse, filtreleme yapma
                 pass
         
         # Sonuçları zaman damgasına göre sırala ve ilk 50'sini al
