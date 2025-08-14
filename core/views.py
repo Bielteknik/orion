@@ -109,12 +109,10 @@ class DashboardView(LoginRequiredMixin, View):
 
         # Sayfanın üst kısmındaki istasyon değiştirme menüsü için diğer tüm cihazlar
         all_devices_for_nav = Device.objects.exclude(id=device_id).order_by('name')
-
-        # Sol taraftaki 2x2'lik grid için sensörleri al
-        sensors_for_cards = target_device.sensors.all()[:4] # Sadece ilk 4 sensör
+        active_sensors = target_device.sensors.filter(is_active=True)
+        sensors_for_cards = active_sensors[:4] # Sadece ilk 4 aktif sensör
         sensor_card_data = []
         for sensor in sensors_for_cards:
-            # Her sensör için son okumayı bul ve listeye ekle
             sensor_card_data.append({
                 'sensor': sensor,
                 'reading': SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
@@ -155,6 +153,10 @@ class DashboardView(LoginRequiredMixin, View):
             ).count(),
             'today_date': timezone.now().strftime('%Y-%m-%d'),
             'filtered_date': filter_date_str,
+            # YENİ: Toplam aktif sensör sayısını da şablona gönderelim
+            'active_sensor_count': active_sensors.count(), 
+            # YENİ: Eğer 4'ten fazla sensör varsa, tüm aktif sensörleri de gönderelim
+            'all_active_sensors': active_sensors if active_sensors.count() > 4 else None,            
         }
         
         return render(request, 'dashboard.html', context)
