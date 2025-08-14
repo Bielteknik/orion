@@ -1,61 +1,75 @@
 import cv2
 import threading
-from django.http import StreamingHttpResponse
+import time
+from django.http import StreamingHttpResponse, HttpResponse
 from .models import Camera
-
-from django.http import HttpResponse
 
 class VideoCamera:
     def __init__(self, rtsp_url):
+        print(f"Kamera başlatılıyor: {rtsp_url}")
         self.video = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-        self.grabbed, self.frame = self.video.read()
-        self.lock = threading.Lock()
+        self.is_running = self.video.isOpened() # Başlangıçta bağlantı durumunu kontrol et
         
-        # Ayrı bir thread'de sürekli kare okumayı başlat
+        if not self.is_running:
+            print(f"HATA: Kamera akışına bağlanılamadı: {rtsp_url}")
+            return
+
+        self.grabbed, self.frame = self.video.read()
+        if not self.grabbed:
+            print("HATA: İlk kare alınamadı.")
+            self.is_running = False
+            self.video.release()
+            return
+            
+        self.lock = threading.Lock()
         threading.Thread(target=self.update, args=(), daemon=True).start()
 
     def __del__(self):
-        self.video.release()
+        if self.video.isOpened():
+            self.video.release()
 
     def get_frame(self):
-        with self.lock:
-            # En son okunan kareyi kopyala ve döndür
-            frame_copy = self.frame.copy() if self.grabbed else None
-        
-        if frame_copy is None:
+        if not self.is_running:
             return None
-
-        # Kareyi JPEG formatına çevir
-        _, jpeg = cv2.imencode('.jpg', frame_copy)
-        return jpeg.tobytes()
+        with self.lock:
+            if not self.grabbed: return None
+            frame_copy = self.frame.copy()
+        
+        ret, jpeg = cv2.imencode('.jpg', frame_copy)
+        return jpeg.tobytes() if ret else None
 
     def update(self):
-        # Arka planda sürekli kare okuyan fonksiyon
-        while True:
+        while self.is_running:
             grabbed, frame = self.video.read()
             with self.lock:
                 self.grabbed = grabbed
                 self.frame = frame
+            if not grabbed:
+                print("UYARI: Kamera akışı kesildi.")
+                self.is_running = False
+                break
+            time.sleep(0.03) # ~30fps için
 
 def gen(camera):
-    while True:
+    while camera.is_running:
         frame = camera.get_frame()
         if frame is None:
-            # Kamera bağlantısı koparsa veya kare alınamazsa döngüden çık
-            # Burada alternatif olarak "bağlantı yok" resmi de gönderilebilir
             break
-
-        # HTTP multipart response formatında kareyi gönder
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+    print("Yayın sonlandırıldı.")
 
 def camera_feed(request, pk):
     try:
         camera_obj = Camera.objects.get(pk=pk, status='active')
         cam = VideoCamera(camera_obj.rtsp_url)
+        
+        # DÜZELTME: Kamera bağlantısı başlangıçta başarısız olduysa, hata döndür.
+        if not cam.is_running:
+            return HttpResponse(f"Kamera akışına bağlanılamadı. Lütfen RTSP URL'ini kontrol edin: {camera_obj.rtsp_url}", status=503) # 503 Service Unavailable
+
         return StreamingHttpResponse(gen(cam), content_type='multipart/x-mixed-replace; boundary=frame')
     except Camera.DoesNotExist:
-        # Kamera bulunamazsa veya aktif değilse 404 döndür
         return HttpResponse("Kamera bulunamadı veya aktif değil.", status=404)
     except Exception as e:
         print(f"Kamera yayını hatası: {e}")
