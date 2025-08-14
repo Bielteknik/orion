@@ -25,35 +25,52 @@
 <div class="row">
 <!-- Sol Taraf: 2x2 Sensör Kartları -->
     <div class="col-lg-4">
-        <div class="row">
-            {% for card_data in sensor_cards %}
-                <div class="col-md-6 col-12 mb-4">
-                    {% if card_data %}
-                        {# DOLU KART #}
-                        <div class="glass-card h-100 text-center d-flex flex-column justify-content-center sensor-detail-trigger" 
-                             style="cursor: pointer; min-height: 150px;" 
-                             data-sensor-id="{{ card_data.sensor.id }}">
-                            <h5 class="mb-3 text-truncate" title="{{ card_data.sensor.name }}">{{ card_data.sensor.name }}</h5>
-                            {% with reading=card_data.reading %}
-                                {% if reading and reading.value %}
-                                    {% for key, value in reading.value.items %}{% if forloop.first %}
-                                    <h2 class="display-6 fw-bold">{{ value|floatformat:1 }}<small class="fs-5 text-muted">{% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}</small></h2>
-                                    {% endif %}{% endfor %}
-                                {% else %}
-                                    <h2 class="display-6 fw-bold text-muted">-</h2>
-                                {% endif %}
-                            {% endwith %}
+        {% if device.sensors.all|length <= 4 %}
+            <!-- EĞER 4 VEYA DAHA AZ SENSÖR VARSA: 2x2 Grid Göster -->
+            <div class="row">
+                {% for card_data in sensor_cards %}
+                    <div class="col-md-6 col-12 mb-4">
+                        {% if card_data %}
+                            <div class="glass-card h-100 text-center d-flex flex-column justify-content-center sensor-detail-trigger" 
+                                 style="cursor: pointer; min-height: 150px;" 
+                                 data-sensor-id="{{ card_data.sensor.id }}">
+                                <h5 class="mb-3 text-truncate" title="{{ card_data.sensor.name }}">{{ card_data.sensor.name }}</h5>
+                                {% with reading=card_data.reading %}
+                                {% if reading and reading.value %}{% for key, value in reading.value.items %}{% if forloop.first %}
+                                <h2 class="display-6 fw-bold">{{ value|floatformat:1 }}<small class="fs-5 text-muted">{% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}</small></h2>
+                                {% endif %}{% endfor %}{% else %}<h2 class="display-6 fw-bold text-muted">-</h2>{% endif %}
+                                {% endwith %}
+                            </div>
+                        {% else %}
+                            <div class="glass-card h-100 d-none d-md-block" style="min-height: 150px; border-style: dashed; background: rgba(255, 255, 255, 0.05);"></div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <!-- EĞER 4'TEN FAZLA SENSÖR VARSA: 2 Sütunlu Liste Göster -->
+            <div class="glass-card h-100">
+                <h5 class="mb-3">Tüm Sensörler ({{ device.sensors.all|length }})</h5>
+                <div class="row" style="max-height: 450px; overflow-y: auto;">
+                    {% for sensor in device.sensors.all %}
+                        <div class="col-6 mb-3">
+                            <div class="sensor-list-item p-2 rounded {% if forloop.counter|divisibleby:2 %}bg-light{% endif %}">
+                                <div class="text-truncate" title="{{ sensor.name }}">{{ sensor.name }}</div>
+                                {% with reading=sensor_readings|get_item:sensor.id %}
+                                <div class="fw-bold fs-5">
+                                    {% if reading and reading.value %}{% for key, value in reading.value.items %}{% if forloop.first %}
+                                        {{ value|floatformat:1 }} <small class="text-muted fs-6">{% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}</small>
+                                    {% endif %}{% endfor %}{% else %}-{% endif %}
+                                </div>
+                                {% endwith %}
+                            </div>
                         </div>
-                    {% else %}
-                        {# BOŞ KART #}
-                        <div class="glass-card h-100 d-none d-md-block" 
-                             style="min-height: 150px; border-style: dashed; background: rgba(255, 255, 255, 0.05);">
-                        </div>
-                    {% endif %}
+                    {% endfor %}
                 </div>
-            {% endfor %}
-        </div>
-    </div>
+            </div>
+        {% endif %}
+
+    </div>    
     <!-- Sağ Taraf: Kamera Alanı -->
     <div class="col-lg-8">
         <div class="glass-card h-100 d-flex flex-column">
