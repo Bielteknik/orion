@@ -99,27 +99,35 @@ class DashboardView(LoginRequiredMixin, View):
 
     def get(self, request, device_id):
         try:
-            # URL'den gelen ID'ye göre istenen cihazı bul
             target_device = Device.objects.prefetch_related('sensors', 'cameras').get(id=device_id)
         except Device.DoesNotExist:
+            # error.html'i daha sonra güzelleştirebiliriz.
             return render(request, 'error.html', {'message': 'İstasyon bulunamadı.'})
 
-        # Dashboard'daki hızlı geçiş menüsü için tüm cihazların listesi
-        all_devices = Device.objects.all().order_by('name')
+        # Dashboard'un üstündeki "diğer istasyonlara geç" menüsü için
+        all_devices_for_nav = Device.objects.exclude(id=device_id).order_by('name')
 
-        # Bu cihaza ait tüm sensörlerin son okumalarını al
-        sensor_readings = {}
-        for sensor in target_device.sensors.all():
-            last_reading = SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
-            sensor_readings[sensor.name] = last_reading # Sensör adına göre sakla
+        # Sensör kartları için her sensörün son okuması
+        sensor_readings = {
+            sensor.id: SensorReading.objects.filter(sensor=sensor).order_by('-timestamp').first()
+            for sensor in target_device.sensors.all()
+        }
+
+        # Alt kısımdaki "Sensör Verileri Listesi" için
+        reading_history = SensorReading.objects.filter(
+            sensor__device=target_device
+        ).select_related('sensor').order_by('-timestamp')[:50] # Son 50 kaydı alalım
 
         context = {
             'device': target_device,
-            'all_devices': all_devices,
+            'all_devices_for_nav': all_devices_for_nav,
             'sensor_readings': sensor_readings,
-            'main_camera': target_device.cameras.first(), # İlk kamerayı ana kamera olarak al
-            # Geçmiş okumalar listesi (alt panel için)
-            'reading_history': SensorReading.objects.filter(sensor__device=target_device).select_related('sensor').order_by('-timestamp')[:50]
+            'main_camera': target_device.cameras.order_by('name').first(),
+            'reading_history': reading_history,
+            'captures_today_count': CameraCapture.objects.filter(
+                camera__device=target_device, 
+                timestamp__date=timezone.now().date()
+            ).count(),
         }
         return render(request, 'dashboard.html', context)
 

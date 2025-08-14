@@ -1,174 +1,167 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
-
-{% block title %}Dashboard - {{ block.super }}{% endblock title %}
+{% load custom_filters %}
+{% block title %}Dashboard: {{ device.name }}{% endblock %}
 
 {% block content %}
-<div id="dashboard" class="page-content active">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title">
-            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="dropdown">
+        <h2 class="page-title dropdown-toggle" type="button" data-bs-toggle="dropdown">
+           <i class="fas fa-broadcast-tower me-2"></i> {{ device.name }}
         </h2>
-        <div style="color: var(--text-light); font-weight: 500;">
-            <i class="fas fa-clock me-2"></i>
-            <span id="currentTime"></span>
+        <ul class="dropdown-menu">
+            {% for nav_device in all_devices_for_nav %}
+            <li><a class="dropdown-item" href="{% url 'dashboard' device_id=nav_device.id %}">{{ nav_device.name }}</a></li>
+            {% endfor %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'stations' %}">Tüm İstasyonlar...</a></li>
+        </ul>
+    </div>
+    <div style="color: var(--text-light); font-weight: 500;">
+        <i class="fas fa-clock me-2"></i><span id="currentTime"></span>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Sol Taraf: 2x2 Sensör Kartları -->
+    <div class="col-lg-3">
+        <div class="row">
+            {% for sensor in device.sensors.all %}
+                {% if forloop.counter <= 4 %} {# İlk 4 sensörü gösterelim #}
+                <div class="col-12 mb-4">
+                    <div class="glass-card h-100 text-center sensor-detail-trigger" style="cursor: pointer;" data-sensor-id="{{ sensor.id }}">
+                        <h5 class="mb-3">{{ sensor.name }}</h5>
+                        {% with reading=sensor_readings|get_item:sensor.id %}
+                        {% if reading %}
+                            {% for key, value in reading.value.items %}
+                                {% if forloop.first %}
+                                    <h2 class="display-6 fw-bold">
+                                        {{ value|floatformat:1 }}
+                                        <small class="fs-5">
+                                        {% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}
+                                        </small>
+                                    </h2>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <h2 class="display-6 fw-bold text-muted">-</h2>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
         </div>
     </div>
 
-    <!-- Hata durumu veya Cihaz yoksa -->
-    {% if error %}
-        <div class="alert alert-warning">{{ error }} Lütfen admin panelinden bir cihaz atayın.</div>
-    {% elif device %}
-        <!-- İstasyon Kartı (Dinamik) -->
-        <div class="row mb-4">
-            <div class="col-md-6 mb-3">
-                <div class="station-card">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5><i class="fas fa-map-marker-alt me-2"></i>{{ device.name }}</h5>
-                            <p class="mb-1">Konum: {{ device.location|default:"Belirtilmemiş" }}</p>
-                            <p class="mb-0">Durum: 
-                                {% if device.is_active %}
-                                    <span class="badge bg-success">Aktif</span>
-                                {% else %}
-                                    <span class="badge bg-danger">Pasif</span>
-                                {% endif %}
-                            </p>
-                        </div>
-                        <div class="text-center">
-                            <i class="fas fa-snowflake weather-icon"></i>
-                            <!-- Son okumadaki sıcaklığı göster -->
-                            <h3>{{ last_reading.value.temperature|floatformat:1 }}°C</h3>
-                        </div>
-                    </div>
-                </div>
-        </div>
-
-        <!-- Sensör Kartı (Dinamik - Son Okumaya Göre) -->
-        {% if last_reading %}
-        <div class="row mb-4">
-            <div class="col-md-4 mb-3">
-                <div class="sensor-card temperature">
-                    <div class="text-center">
-                        <i class="fas fa-thermometer-half fa-2x mb-2"></i>
-                        <h4>Sıcaklık</h4>
-                        <!-- 'floatformat:1' ondalık sayıyı 1 basamağa yuvarlar -->
-                        <h2>{{ last_reading.value.temperature|floatformat:1 }}°C</h2>
-                    </div>
+    <!-- Sağ Taraf: Kamera Alanı -->
+    <div class="col-lg-9">
+        <div class="glass-card h-100">
+        {% if main_camera %}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-bold">{{ main_camera.name }}</div>
+                <div>
+                    <button class="btn btn-sm btn-success play-stream-btn" data-status="stopped" data-feed-url="{% url 'camera-feed' main_camera.pk %}" data-target-id="main-camera-feed"><i class="fas fa-play me-2"></i>Başlat</button>
+                    <span class="badge bg-secondary ms-2">DURUM</span>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
-                <div class="sensor-card humidity">
-                    <div class="text-center">
-                        <i class="fas fa-tint fa-2x mb-2"></i>
-                        <h4>Nem</h4>
-                        <h2>{{ last_reading.value.humidity|floatformat:0 }}%</h2>
-                    </div>
+            <div id="main-camera-feed" class="bg-dark rounded mb-3 position-relative" style="height: 350px;">
+                 <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center">
+                    <i class="fas fa-play-circle fa-4x mb-3"></i> <p>Canlı Yayını Başlat</p>
                 </div>
             </div>
-            <!-- Diğer sensör kartları eklenebilir -->
-        </div>
+            <div class="d-flex justify-content-end">
+                <span class="badge bg-info me-2">Bugün Çekilen: {{ captures_today_count }}</span>
+                <button class="btn btn-sm btn-outline-primary" disabled><i class="fas fa-images me-2"></i>Galeri</button>
+            </div>
+        {% else %}
+            <div class="d-flex align-items-center justify-content-center h-100 text-muted">Bu istasyona atanmış kamera yok.</div>
         {% endif %}
+        </div>
+    </div>
+</div>
 
-        <!-- Grafik ve Liste -->
-        <div class="row">
-            <div class="col-md-8">
-                <div class="chart-container">
-                    <h5 class="mb-3">24 Saatlik Trend</h5>
-                    <canvas id="trendChart" height="100"></canvas>
-                </div>
+<!-- Alt Kısım: Sensör Verileri Listesi -->
+<div class="glass-card mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Sensör Verileri Listesi</h5>
+        <div>
+            <input type="date" class="form-control form-control-sm d-inline-block" style="width: auto;">
+            <button class="btn btn-sm btn-primary ms-2">Ara</button>
+        </div>
+    </div>
+    <div class="table-responsive" style="max-height: 400px;">
+        <table class="table table-hover">
+            <thead><tr><th>Zaman</th><th>Sensör</th><th>Veri</th></tr></thead>
+            <tbody>
+                {% for reading in reading_history %}
+                <tr>
+                    <td>{{ reading.timestamp|date:"d.m.Y H:i:s" }}</td>
+                    <td>{{ reading.sensor.name }}</td>
+                    <td><code>{{ reading.value|json_script:"data"|safe }}</code></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-center text-muted">Henüz veri yok.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- YENİ: Sensör Detay Modal'ı -->
+<div class="modal fade" id="sensorDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sensorModalTitle">Sensör Detayları</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="col-md-4">
-                <div class="glass-card">
-                    <h5 style="color: var(--dark-color); font-weight: 600;" class="mb-3">Son Ölçümler</h5>
-                    <div class="list-group list-group-flush">
-                        {% for reading in recent_readings %}
-                            <div class="list-group-item bg-transparent border-secondary" style="color: var(--dark-color);">
-                                <div class="d-flex justify-content-between">
-                                    <span>
-                                        <!-- Her okumanın hangi sensörden geldiğini göster -->
-                                        <i class="fas fa-broadcast-tower me-2"></i>{{ reading.sensor.name }}
-                                    </span>
-                                    <span>
-                                        {{ reading.value.temperature|floatformat:1 }}°C / {{ reading.value.humidity|floatformat:0 }}%
-                                    </span>
-                                </div>
-                                <!-- 'timesince' filtresi "2 dakika önce" gibi bir çıktı verir -->
-                                <small style="color: var(--text-light);">{{ reading.timestamp|timesince }} önce</small>
-                            </div>
-                        {% empty %}
-                            <p class="text-muted">Henüz ölçüm verisi yok.</p>
-                        {% endfor %}
-                    </div>
-                </div>
+            <div class="modal-body" id="sensorModalBody">
+                <p class="text-center">Yükleniyor...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
             </div>
         </div>
-    {% endif %}
+    </div>
 </div>
-{% endblock content %}
+
+{% endblock %}
 
 {% block extra_js %}
 <script>
-    // Zaman güncelleme
-    function updateTime() {
-        const now = new Date();
-        document.getElementById('currentTime').textContent = now.toLocaleString('tr-TR');
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
+$(document).ready(function() {
+    // Saat
+    function updateTime() { $('#currentTime').text(new Date().toLocaleString('tr-TR')); }
+    setInterval(updateTime, 1000); updateTime();
 
-    // Grafik oluşturma (Dinamik veri ile)
-    document.addEventListener('DOMContentLoaded', function() {
-        // Django context'inden gelen JSON verilerini JavaScript değişkenlerine ata
-        // 'safe' filtresi, JSON string'inin HTML içinde güvenli bir şekilde render edilmesini sağlar.
-        const chartLabels = JSON.parse('{{ chart_labels|safe }}');
-        const tempData = JSON.parse('{{ chart_temp_data|safe }}');
-        const humData = JSON.parse('{{ chart_hum_data|safe }}');
-
-        const ctx = document.getElementById('trendChart');
-        if (ctx) {
-            new Chart(ctx.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: chartLabels,
-                    datasets: [{
-                        label: 'Sıcaklık (°C)',
-                        data: tempData,
-                        borderColor: 'rgb(231, 76, 60)',
-                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                        yAxisID: 'y',
-                        tension: 0.4,
-                        fill: true,
-                    }, {
-                        label: 'Nem (%)',
-                        data: humData,
-                        borderColor: 'rgb(52, 152, 219)',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        yAxisID: 'y1',
-                        tension: 0.4,
-                        fill: true,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: { display: true, text: 'Sıcaklık (°C)' }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: { display: true, text: 'Nem (%)' },
-                            grid: { drawOnChartArea: false } 
-                        }
-                    }
-                }
-            });
+    // Kamera başlat/durdur
+    $('.play-stream-btn').on('click', function() {
+        const btn = $(this);
+        const targetId = btn.data('target-id');
+        const container = $(`#${targetId}`);
+        if (btn.data('status') === 'stopped') {
+            container.html(`<img src="${btn.data('feed-url')}" width="100%" height="100%" style="object-fit: cover;">`);
+            btn.data('status', 'playing').removeClass('btn-success').addClass('btn-danger').html('<i class="fas fa-stop me-2"></i>Durdur');
+        } else {
+            container.html('<div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center"><i class="fas fa-play-circle fa-4x mb-3"></i><p>Yayın Durduruldu</p></div>');
+            btn.data('status', 'stopped').removeClass('btn-danger').addClass('btn-success').html('<i class="fas fa-play me-2"></i>Başlat');
         }
     });
+
+    // Sensör Detay Modalını aç
+    const sensorModal = new bootstrap.Modal(document.getElementById('sensorDetailModal'));
+    $('.sensor-detail-trigger').on('click', function() {
+        const sensorId = $(this).data('sensor-id');
+        $('#sensorModalBody').html('<p class="text-center">Yükleniyor...</p>');
+        sensorModal.show();
+        // NOT: Buraya AJAX ile sunucudan sensörün detaylarını ve geçmiş verilerini
+        // çekecek bir kod yazacağız (bir sonraki adımda).
+        // Şimdilik sadece modal'ı açıyoruz.
+        setTimeout(() => {
+             $('#sensorModalBody').html('<p class="text-center">Bu sensörün detaylı istatistikleri ve grafiği burada gösterilecek.</p>');
+        }, 1000);
+    });
+});
 </script>
-{% endblock extra_js %}
+{% endblock %}
