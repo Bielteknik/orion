@@ -22,30 +22,31 @@
     </div>
 </div>
 
+<!-- YENİ ve DOĞRU GRID YAPISI -->
 <div class="row">
     <!-- Sol Taraf: 2x2 Sensör Kartları -->
-    <div class="col-lg-3">
+    <div class="col-lg-4">
         <div class="row">
             {% for sensor in device.sensors.all %}
-                {% if forloop.counter <= 4 %} {# İlk 4 sensörü gösterelim #}
-                <div class="col-12 mb-4">
+                {% if forloop.counter <= 4 %} {# Sadece ilk 4 sensörü bu alanda göster #}
+                <div class="col-md-6 mb-4">
                     <div class="glass-card h-100 text-center sensor-detail-trigger" style="cursor: pointer;" data-sensor-id="{{ sensor.id }}">
-                        <h5 class="mb-3">{{ sensor.name }}</h5>
+                        <h5 class="mb-3 text-truncate">{{ sensor.name }}</h5>
                         {% with reading=sensor_readings|get_item:sensor.id %}
-                        {% if reading %}
-                            {% for key, value in reading.value.items %}
-                                {% if forloop.first %}
-                                    <h2 class="display-6 fw-bold">
-                                        {{ value|floatformat:1 }}
-                                        <small class="fs-5">
-                                        {% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}
-                                        </small>
-                                    </h2>
-                                {% endif %}
-                            {% endfor %}
-                        {% else %}
-                            <h2 class="display-6 fw-bold text-muted">-</h2>
-                        {% endif %}
+                            {% if reading and reading.value %}
+                                {% for key, value in reading.value.items %}
+                                    {% if forloop.first %}
+                                        <h2 class="display-6 fw-bold">
+                                            {{ value|floatformat:1 }}
+                                            <small class="fs-5 text-muted">
+                                            {% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}
+                                            </small>
+                                        </h2>
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <h2 class="display-6 fw-bold text-muted">-</h2>
+                            {% endif %}
                         {% endwith %}
                     </div>
                 </div>
@@ -55,8 +56,8 @@
     </div>
 
     <!-- Sağ Taraf: Kamera Alanı -->
-    <div class="col-lg-9">
-        <div class="glass-card h-100">
+    <div class="col-lg-8">
+        <div class="glass-card h-100 d-flex flex-column">
         {% if main_camera %}
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <div class="fw-bold">{{ main_camera.name }}</div>
@@ -65,7 +66,7 @@
                     <span class="badge bg-secondary ms-2">DURUM</span>
                 </div>
             </div>
-            <div id="main-camera-feed" class="bg-dark rounded mb-3 position-relative" style="height: 350px;">
+            <div id="main-camera-feed" class="bg-dark rounded mb-3 position-relative flex-grow-1">
                  <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center">
                     <i class="fas fa-play-circle fa-4x mb-3"></i> <p>Canlı Yayını Başlat</p>
                 </div>
@@ -87,7 +88,7 @@
         <h5 class="mb-0">Sensör Verileri Listesi</h5>
         <div>
             <input type="date" class="form-control form-control-sm d-inline-block" style="width: auto;">
-            <button class="btn btn-sm btn-primary ms-2">Ara</button>
+            <button class="btn btn-sm btn-primary ms-2" disabled>Ara</button>
         </div>
     </div>
     <div class="table-responsive" style="max-height: 400px;">
@@ -98,10 +99,10 @@
                 <tr>
                     <td>{{ reading.timestamp|date:"d.m.Y H:i:s" }}</td>
                     <td>{{ reading.sensor.name }}</td>
-                    <td><code>{{ reading.value|json_script:"data"|safe }}</code></td>
+                    <td><code>{{ reading.value|safe }}</code></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="3" class="text-center text-muted">Henüz veri yok.</td></tr>
+                <tr><td colspan="3" class="text-center text-muted">Geçmiş ölçüm verisi yok.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
