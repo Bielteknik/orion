@@ -259,36 +259,58 @@ class SensorDetailDataView(APIView):
         if period == '7d': start_time = now - timedelta(days=7)
         else: start_time = now - timedelta(hours=24)
 
-        readings = SensorReading.objects.filter(sensor=sensor, timestamp__gte=start_time)
+        # 1. Ham veriyi veritabanından çekelim
+        readings = SensorReading.objects.filter(
+            sensor=sensor, 
+            timestamp__gte=start_time
+        ).order_by('timestamp').values('timestamp', 'value')
         
-        # İstatistikleri ve grafik verilerini hazırla
-        # Sadece sayısal değerler içeren anahtarları bul
-        numeric_keys = set()
-        for r in readings[:20]: # İlk 20 kaydı kontrol et
-            if r.value:
-                for key, value in r.value.items():
-                    if isinstance(value, (int, float)):
-                        numeric_keys.add(key)
-        
+        if not readings:
+            return Response({
+                'sensor_info': SensorSerializer(sensor).data,
+                'stats': {}, 'chart_data': {}
+            })
+
+        # 2. Veriyi ve istatistikleri Python içinde işleyelim
         stats = {}
         chart_data = {}
-        for key in numeric_keys:
-            # Sadece bu anahtarın null olmadığı kayıtlar üzerinden hesaplama yap
-            key_readings = readings.filter(value__has_key=key)
-            aggregation = key_readings.aggregate(
-                min_val=Min(f'value__{key}'),
-                max_val=Max(f'value__{key}'),
-                avg_val=Avg(f'value__{key}'),
-                std_dev=StdDev(f'value__{key}'),
-                variance=Variance(f'value__{key}')
-            )
-            stats[key] = aggregation
-            chart_data[key] = list(key_readings.order_by('timestamp').values('timestamp', f'value__{key}'))
+        
+        # readings listesindeki her bir okumayı gez
+        for reading in readings:
+            if not isinstance(reading['value'], dict): continue
+            
+            # Okumanın içindeki her bir anahtar/değer çiftini işle (örn: 'temperature', 'humidity')
+            for key, value in reading['value'].items():
+                # Sadece sayısal değerlerle ilgilen
+                if not isinstance(value, (int, float)): continue
 
-        # Sensör bilgilerini de ekleyelim
+                # Eğer bu anahtar için listeler daha önce oluşturulmadıysa, şimdi oluştur
+                if key not in stats:
+                    stats[key] = []
+                if key not in chart_data:
+                    chart_data[key] = []
+
+                # Değeri istatistik listesine ekle
+                stats[key].append(value)
+                # Grafiğe uygun formatta veriyi ekle
+                chart_data[key].append({
+                    'timestamp': reading['timestamp'],
+                    f'value__{key}': value
+                })
+
+        # 3. İstatistikleri hesapla
+        final_stats = {}
+        for key, value_list in stats.items():
+            if value_list:
+                final_stats[key] = {
+                    'min_val': min(value_list),
+                    'max_val': max(value_list),
+                    'avg_val': sum(value_list) / len(value_list),
+                }
+
         response_data = {
             'sensor_info': SensorSerializer(sensor).data,
-            'stats': stats,
+            'stats': final_stats,
             'chart_data': chart_data,
         }
         return Response(response_data)
