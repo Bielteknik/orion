@@ -4,6 +4,20 @@
 {% block title %}Dashboard: {{ device.name }}{% endblock %}
 
 {% block content %}
+
+<!-- YENİ: Toast Bildirim Alanı -->
+<div class.="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
+    <div id="cameraErrorToast" class.="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class.="toast-header bg-danger text-white">
+            <strong class.="me-auto"><i class.="fas fa-exclamation-triangle me-2"></i>Kamera Hatası</strong>
+            <button type="button" class.="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class.="toast-body" id="cameraErrorToastBody">
+            <!-- Hata mesajı buraya gelecek -->
+        </div>
+    </div>
+</div>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div class="dropdown">
         <h2 class="page-title dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
@@ -161,6 +175,12 @@ $(document).ready(function() {
     function startStream() {
         if (streamActive || !feedUrl) return;
 
+        const imgElement = $('<img>', {
+            src: feedUrl,
+            id: 'camera-stream-img',
+            css: { width: '100%', height: '100%', 'object-fit': 'cover', 'cursor': 'pointer' }
+        });
+
         playOverlay.hide();
         // Geçici bir yükleniyor durumu ekleyelim
         cameraContainer.append('<div id="stream-loader" class="h-100 d-flex align-items-center justify-content-center text-white"><div class="spinner-border"></div></div>');
@@ -171,10 +191,10 @@ $(document).ready(function() {
             css: { width: '100%', height: '100%', 'object-fit': 'cover' }
         });
 
-        // Görüntü başarıyla yüklendiğinde çalışacak
+        // Görüntü başarıyla yüklendiğinde
         imgElement.on('load', function() {
-            $('#stream-loader').remove(); // Yükleniyor animasyonunu kaldır
-            cameraContainer.append(imgElement); // Resmi ekle
+            $('#stream-loader').remove();
+            cameraContainer.append(imgElement);
             controlsOverlay.css('display', 'flex');
             playToggleButton.html('<i class="fas fa-pause"></i>');
             streamActive = true;
@@ -183,28 +203,19 @@ $(document).ready(function() {
         // Hata durumunda çalışacak
         imgElement.on('error', function() {
             $('#stream-loader').remove();
-            // fetch ile sunucudan dönen hata metnini al
+            // GÜNCELLENDİ: Hata kutusu yerine toast'ı tetikle
             fetch(feedUrl)
-                .then(response => response.text()) // Yanıtı metin olarak oku
+                .then(response => response.text())
                 .then(errorMessage => {
-                    const cleanErrorMessage = errorMessage.replace(/<[^>]*>?/gm, ''); // HTML etiketlerini temizle
-                    cameraContainer.append(`
-                        <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white text-center bg-danger p-3">
-                            <i class="fas fa-exclamation-triangle fa-3x mb-2"></i>
-                            <p class="fw-bold">Yayın Başlatılamadı!</p>
-                            <small>${cleanErrorMessage || 'Kamera yanıt vermiyor.'}</small>
-                        </div>
-                    `);
-                })
-                .catch(() => { // fetch de başarısız olursa
-                     cameraContainer.append('<div class="h-100 ... bg-danger ...">Ağ Hatası!</div>');
+                    const cleanErrorMessage = errorMessage.replace(/<[^>]*>?/gm, '');
+                    
+                    // Toast içeriğini doldur ve göster
+                    $('#cameraErrorToastBody').text(cleanErrorMessage || 'Kamera yanıt vermiyor.');
+                    const errorToast = new bootstrap.Toast(document.getElementById('cameraErrorToast'));
+                    errorToast.show();
                 });
-            stopStream(); // Stream durumunu resetle
+            stopStream();
         });
-
-        // Tarayıcının src'yi yüklemeye başlaması için img'yi body'ye (gizli olarak) eklememiz gerekebilir,
-        // ama genellikle src'yi atamak yeterlidir.
-        // $('body').append(imgElement.hide()); // Bu satır genellikle gereksiz
     }
 
     function stopStream() {
