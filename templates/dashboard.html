@@ -256,18 +256,94 @@ $(document).ready(function() {
     
     // --- SENSÖR DETAY MODALI ---
     const sensorModal = new bootstrap.Modal(document.getElementById('sensorDetailModal'));
-    
+    let sensorDetailChart = null;
+
     window.openSensorDetailModal = function(sensorId) {
         $('#sensorModalBody').html('<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>');
         $('#sensorModalTitle').text('Yükleniyor...');
         sensorModal.show();
         
-        // Bu bölüm, bir sonraki ve son adım olan Sensör Detay sayfasında
-        // dinamik veri ve grafikle doldurulacaktır.
-        setTimeout(() => {
-             $('#sensorModalBody').html('<p class="text-center p-5">Bu sensörün detaylı istatistikleri ve geçmiş verilerini gösteren grafik burada yer alacak.</p>');
-             $('#sensorModalTitle').text('Sensör Detayları');
-        }, 1000);
+        // Sunucudan sensörün detay verilerini çek
+        $.ajax({
+            url: `/api/v3/sensors/${sensorId}/details/`,
+            method: 'GET',
+            success: function(data) {
+                // Modal'ın içeriğini dinamik olarak oluştur
+                const sensor = data.sensor_info;
+                const stats = data.stats;
+                const chartData = data.chart_data;
+
+                // Anlık değerleri al (varsa)
+                let latestValueHtml = '-';
+                if (Object.keys(stats).length > 0) {
+                    const firstKey = Object.keys(stats)[0];
+                    if (stats[firstKey]) {
+                       const lastReading = chartData[firstKey].slice(-1)[0];
+                       if (lastReading) latestValueHtml = `${parseFloat(lastReading[`value__${firstKey}`]).toFixed(1)} ${getUnit(firstKey)}`;
+                    }
+                }
+                
+                let modalHtml = `
+                    <div class="row">
+                        <div class="col-md-6"><h6>Genel Bilgiler</h6><p><strong>Sensör ID:</strong> ${sensor.id}<br><strong>Tip:</strong> ${sensor.name}<br><strong>İstasyon:</strong> ${sensor.device_name}</p></div>
+                        <div class="col-md-6"><h6>Anlık Değerler</h6><p><strong>Mevcut Değer:</strong> ${latestValueHtml}<br><strong>Minimum:</strong> -<br><strong>Maksimum:</strong> -<br><strong>Ortalama:</strong> -</p></div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>24 Saatlik Trend</h6>
+                        <select class="form-select form-select-sm" style="width: auto;"><option>Son 24 Saat</option><option>Son 7 Gün</option></select>
+                    </div>
+                    <div class="chart-container" style="height: 250px;">
+                        <canvas id="sensorDetailChartCanvas"></canvas>
+                    </div>
+                `;
+                $('#sensorModalBody').html(modalHtml);
+                $('#sensorModalTitle').text(`${sensor.device_name} - ${sensor.name}`);
+                
+                // Grafiği çiz
+                drawSensorDetailChart(chartData);
+            },
+            error: function() {
+                $('#sensorModalBody').html('<div class="alert alert-danger">Veriler yüklenemedi.</div>');
+            }
+        });
+    }
+
+    function getUnit(key) {
+        if (key.includes('temp')) return '°C';
+        if (key.includes('hum')) return '%';
+        if (key.includes('dist')) return 'cm';
+        if (key.includes('wei')) return 'kg';
+        return '';
+    }
+
+    function drawSensorDetailChart(chartData) {
+        if (sensorDetailChart) sensorDetailChart.destroy();
+        const ctx = document.getElementById('sensorDetailChartCanvas').getContext('2d');
+        const datasets = [];
+        const colors = ['#e74c3c', '#3498db'];
+        let colorIndex = 0;
+
+        for (const key in chartData) {
+            datasets.push({
+                label: key,
+                data: chartData[key].map(d => ({ x: new Date(d.timestamp), y: d[`value__${key}`] })),
+                borderColor: colors[colorIndex % colors.length],
+                tension: 0.2, fill: true,
+            });
+            colorIndex++;
+        }
+
+        sensorDetailChart = new Chart(ctx, {
+            type: 'line', data: { datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { type: 'time', time: { tooltipFormat: 'dd.MM.yyyy HH:mm' } },
+                    y: { title: { display: true, text: 'Değer' } }
+                }
+            }
+        });
     }
 });
 </script>

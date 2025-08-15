@@ -5,7 +5,7 @@ from rest_framework.routers import DefaultRouter
 
 from core import camera_stream
 from .views import (
-    DeviceConfigView, SubmitReadingView, DashboardView, StationsView,
+    DeviceConfigView, SensorDetailDataView, SubmitReadingView, DashboardView, StationsView,
     SensorsView, CamerasView, AnalyticsView, MapView, AlertsView, SettingsView,
     DeviceViewSet, SensorViewSet, RuleViewSet, CameraViewSet, CommandViewSet, 
     CameraCaptureViewSet, AnalyticsDataView
@@ -33,6 +33,8 @@ urlpatterns = [
     path('alerts/', AlertsView.as_view(), name='alerts'),
     path('settings/', SettingsView.as_view(), name='settings'),
     
+    # YENİ: Sensör detay verisi için endpoint
+    path('sensors/<int:pk>/details/', SensorDetailDataView.as_view(), name='api-sensor-details'),    
     # Kamera yayını için özel URL
     path('cameras/<int:pk>/feed/', camera_stream.camera_feed, name='camera-feed'),
 

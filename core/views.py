@@ -9,6 +9,7 @@ from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 import json
 from datetime import datetime, timedelta
+from django.db.models import Avg, Max, Min, StdDev, Variance
 
 from rest_framework import status, viewsets
 from rest_framework.views import APIView
@@ -242,3 +243,52 @@ class AlertsView(LoginRequiredMixin, View):
 class SettingsView(LoginRequiredMixin, View):
     login_url = '/admin/login/';
     def get(self, request): return render(request, 'settings.html', {})
+
+class SensorDetailDataView(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        try:
+            sensor = Sensor.objects.get(pk=pk)
+        except Sensor.DoesNotExist:
+            return Response({"error": "Sensör bulunamadı."}, status=status.HTTP_404_NOT_FOUND)
+
+        period = request.query_params.get('period', '24h')
+        now = timezone.now()
+        if period == '7d': start_time = now - timedelta(days=7)
+        else: start_time = now - timedelta(hours=24)
+
+        readings = SensorReading.objects.filter(sensor=sensor, timestamp__gte=start_time)
+        
+        # İstatistikleri ve grafik verilerini hazırla
+        # Sadece sayısal değerler içeren anahtarları bul
+        numeric_keys = set()
+        for r in readings[:20]: # İlk 20 kaydı kontrol et
+            if r.value:
+                for key, value in r.value.items():
+                    if isinstance(value, (int, float)):
+                        numeric_keys.add(key)
+        
+        stats = {}
+        chart_data = {}
+        for key in numeric_keys:
+            # Sadece bu anahtarın null olmadığı kayıtlar üzerinden hesaplama yap
+            key_readings = readings.filter(value__has_key=key)
+            aggregation = key_readings.aggregate(
+                min_val=Min(f'value__{key}'),
+                max_val=Max(f'value__{key}'),
+                avg_val=Avg(f'value__{key}'),
+                std_dev=StdDev(f'value__{key}'),
+                variance=Variance(f'value__{key}')
+            )
+            stats[key] = aggregation
+            chart_data[key] = list(key_readings.order_by('timestamp').values('timestamp', f'value__{key}'))
+
+        # Sensör bilgilerini de ekleyelim
+        response_data = {
+            'sensor_info': SensorSerializer(sensor).data,
+            'stats': stats,
+            'chart_data': chart_data,
+        }
+        return Response(response_data)
