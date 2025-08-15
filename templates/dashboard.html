@@ -4,8 +4,7 @@
 {% block title %}Dashboard: {{ device.name }}{% endblock %}
 
 {% block content %}
-
-<!-- Hata Bildirimleri için Sağ Üst Köşede Görünmez Alan -->
+<!-- Hata/Başarı Bildirimleri için Sağ Üst Köşede Görünmez Alan -->
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
     <div id="mainToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="toast-header">
@@ -37,33 +36,49 @@
 
 <!-- Ana Grid Yapısı -->
 <div class="row">
-    <!-- Sol Taraf: 2x2 Sensör Kartları -->
+    <!-- Sol Taraf: Gelişmiş Sensör Kartları -->
     <div class="col-lg-4">
         <div class="row">
             {% for card_info in sensor_cards %}
-            <div class="col-md-6 col-12 mb-4">
-                {% if card_info %}
-                    <div class="glass-card h-100 text-center d-flex flex-column justify-content-center" style="min-height: 150px;">
-                        <h5 class="mb-3 text-truncate" title="{{ card_info.sensor.name }}">{{ card_info.sensor.name }}</h5>
-                        {% with reading=card_info.reading %}
-                        {% if reading and reading.value %}
-                            {% for key, value in reading.value.items %}
-                                {% if forloop.first %}
-                                    <h2 class="display-6 fw-bold">
-                                        {{ value|floatformat:1 }}
-                                        <small class="fs-5 text-muted">
-                                        {% if 'temperature' in key %}°C{% elif 'humidity' in key %}%{% elif 'distance' in key %}cm{% elif 'weight' in key %}kg{% endif %}
-                                        </small>
-                                    </h2>
-                                {% endif %}
-                            {% endfor %}
-                        {% else %}<h2 class="display-6 fw-bold text-muted">-</h2>{% endif %}
-                        {% endwith %}
-                    </div>
-                {% else %}
-                    <div class="glass-card h-100 d-none d-md-block" style="min-height: 150px; border-style: dashed; background: rgba(255, 255, 255, 0.05);"></div>
-                {% endif %}
-            </div>
+                <div class="col-md-6 col-12 mb-4">
+                    {% if card_info %}
+                        <div class="sensor-card {% if not card_info.sensor.is_active %}opacity-50{% endif %}" style="cursor: pointer;"
+                             onclick="openSensorDetailModal('{{ card_info.sensor.id }}')">
+                            <div class="row">
+                                <div class="col-8">
+                                    <h6 class="text-truncate" title="{{ card_info.sensor.name }}">{{ card_info.sensor.name }}</h6>
+                                    {% with reading=card_info.reading %}
+                                        {% if reading and reading.value %}
+                                            {% for key, value in reading.value.items %}
+                                                {% if forloop.first %}
+                                                    <h3 class="fw-bold">
+                                                        {{ value|floatformat:1 }}
+                                                        <small class="text-muted fs-6">
+                                                            {% if 'temp' in key %}°C{% elif 'hum' in key %}%{% elif 'dist' in key %}cm{% elif 'wei' in key %}kg{% endif %}
+                                                        </small>
+                                                    </h3>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% else %}
+                                            <h3 class="fw-bold">-</h3>
+                                        {% endif %}
+                                    {% endwith %}
+                                    <small class="text-muted">{{ card_info.sensor.device.name }}</small>
+                                </div>
+                                <div class="col-4 d-flex flex-column align-items-end justify-content-between">
+                                    {% if card_info.sensor.is_active %}
+                                        <span class="badge bg-success">Aktif</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Pasif</span>
+                                    {% endif %}
+                                    <i class="fas fa-thermometer-half fa-2x text-muted mt-2"></i>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="glass-card h-100 d-none d-md-block" style="min-height: 150px; border-style: dashed; background: rgba(255, 255, 255, 0.05);"></div>
+                    {% endif %}
+                </div>
             {% endfor %}
         </div>
     </div>
@@ -79,7 +94,7 @@
                 </div>
                 <div class="camera-controls position-absolute bottom-0 start-0 w-100 p-3 d-flex justify-content-start align-items-center" style="background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); display: none;">
                     <button class="btn btn-dark btn-sm me-2 play-toggle-btn" title="Durdur"><i class="fas fa-pause"></i></button>
-                    <button class="btn btn-dark btn-sm capture-photo-btn" title="Fotoğraf Çek" data-id="{{ main_camera.id }}"><i class="fas fa-camera"></i></button>
+                    <button class="btn btn-dark btn-sm capture-photo-btn" title="Fotoğraf Çek"><i class="fas fa-camera"></i></button>
                 </div>
             </div>
             <div class="d-flex justify-content-end">
@@ -119,6 +134,24 @@
         </table>
     </div>
 </div>
+
+<!-- Sensör Detay Modal'ı -->
+<div class="modal fade" id="sensorDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sensorModalTitle">Sensör Detayları</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="sensorModalBody">
+                <p class="text-center">Yükleniyor...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -149,6 +182,7 @@ $(document).ready(function() {
     const playOverlay = cameraContainer.find('.camera-overlay');
     const controlsOverlay = cameraContainer.find('.camera-controls');
     const playToggleButton = controlsOverlay.find('.play-toggle-btn');
+    const captureButton = controlsOverlay.find('.capture-photo-btn');
     let streamActive = false;
     const feedUrl = "{% if main_camera %}{% url 'camera-feed' main_camera.pk %}{% endif %}";
     const csrftoken = '{{ csrf_token }}';
@@ -181,7 +215,8 @@ $(document).ready(function() {
                 showToast("Ağ Hatası", "Sunucuya ulaşılamıyor.", true);
             });
             stopStream(true);
-        };
+  
+      };
         img.src = feedUrl;
     }
 
@@ -192,28 +227,48 @@ $(document).ready(function() {
             playOverlay.show();
         }
         controlsOverlay.hide();
+        playToggleButton.html('<i class="fas fa-play"></i>').attr('title', 'Oynat');
         streamActive = false;
     }
     
     playOverlay.on('click', startStream);
     playToggleButton.on('click', stopStream);
 
-    $('.capture-photo-btn').on('click', function() {
-        const cameraId = $(this).data('id');
+    captureButton.on('click', function() {
+        const cameraId = "{{ main_camera.id }}";
+        if (!cameraId) return;
+
         const btn = $(this);
-        btn.html('<span class="spinner-border spinner-border-sm"></span>').prop('disabled', true);
+        btn.html('<span class="spinner-border spinner-border-sm"></span>');
+        
         $.ajax({
             url: `/api/v3/cameras/${cameraId}/capture_photo/`,
             method: 'POST',
             headers: {'X-CSRFToken': csrftoken},
             success: function() {
-                showToast("Komut Gönderildi", "Fotoğraf çekme komutu başarıyla gönderildi.", false);
+                showToast("Komut Gönderildi", "Fotoğraf çekme komutu gönderildi.", false);
                 setTimeout(() => location.reload(), 3000);
             },
-            error: function() { showToast("Hata", "Komut gönderilirken bir hata oluştu.", true); },
-            complete: function() { btn.html('<i class="fas fa-camera"></i>').prop('disabled', false); }
+            error: function() { showToast("Hata", "Komut gönderilemedi.", true); },
+            complete: function() { btn.html('<i class="fas fa-camera"></i>'); }
         });
     });
+    
+    // --- SENSÖR DETAY MODALI ---
+    const sensorModal = new bootstrap.Modal(document.getElementById('sensorDetailModal'));
+    
+    window.openSensorDetailModal = function(sensorId) {
+        $('#sensorModalBody').html('<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>');
+        $('#sensorModalTitle').text('Yükleniyor...');
+        sensorModal.show();
+        
+        // Bu bölüm, bir sonraki ve son adım olan Sensör Detay sayfasında
+        // dinamik veri ve grafikle doldurulacaktır.
+        setTimeout(() => {
+             $('#sensorModalBody').html('<p class="text-center p-5">Bu sensörün detaylı istatistikleri ve geçmiş verilerini gösteren grafik burada yer alacak.</p>');
+             $('#sensorModalTitle').text('Sensör Detayları');
+        }, 1000);
+    }
 });
 </script>
 {% endblock %}
